@@ -37,12 +37,25 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    'drf_yasg',
     'api',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
 ]
+
+# Configuration pour Swagger
+SWAGGER_SETTINGS = {
+    'SECURITY_DEFINITIONS': {
+        'Token': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'Ajouter un préfixe "Token " à votre token. Ex: Token abcdef123456'
+        }
+    },
+    'USE_SESSION_AUTH': False,
+}
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

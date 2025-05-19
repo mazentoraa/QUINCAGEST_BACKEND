@@ -1,0 +1,37 @@
+
+# Script d'installation pour la documentation Swagger de l'API
+
+echo "Installation des dépendances..."
+pip install drf-yasg
+
+echo "Ajout de 'drf_yasg' à INSTALLED_APPS dans settings.py..."
+echo "N'oubliez pas d'ajouter ces lignes à votre fichier settings.py:"
+echo ""
+echo "INSTALLED_APPS = ["
+echo "    # ... autres applications"
+echo "    'drf_yasg',"
+echo "]"
+echo ""
+echo "SWAGGER_SETTINGS = {"
+echo "    'SECURITY_DEFINITIONS': {"
+echo "        'Token': {"
+echo "            'type': 'apiKey',"
+echo "            'name': 'Authorization',"
+echo "            'in': 'header',"
+echo "            'description': \"Ajouter un préfixe 'Token ' à votre token. Ex: Token abcdef123456\""
+echo "        }"
+echo "    },"
+echo "    'USE_SESSION_AUTH': False,"
+echo "}"
+
+echo ""
+echo "Assurez-vous de mettre à jour vos fichiers views.py et urls.py comme indiqué dans la documentation."
+echo ""
+echo "Une fois ces modifications effectuées, lancez votre serveur Django:"
+echo "python manage.py runserver"
+echo ""
+echo "La documentation Swagger sera disponible aux adresses suivantes:"
+echo "- http://localhost:8000/swagger/ (Interface Swagger)"
+echo "- http://localhost:8000/redoc/ (Interface ReDoc)"
+echo "- http://localhost:8000/swagger.json (Documentation au format JSON)"
+echo "- http://localhost:8000/swagger.yaml (Documentation au format YAML)"
