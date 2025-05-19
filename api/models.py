@@ -107,6 +107,8 @@ class Matiere(models.Model):
         max_digits=10,
         decimal_places=2,
         help_text="Unit price of the material",
+        null=True,
+        blank=True,
     )
     quantite_en_stock = models.PositiveIntegerField(
         default=0, help_text="Quantity in stock"

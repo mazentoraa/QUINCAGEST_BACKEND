@@ -9,13 +9,19 @@ class MatiereSerializer(serializers.ModelSerializer):
         model = Matiere
         fields = (
             "id",
-            "nom",
+            "type_matiere",
             "description",
-            "prix",
+            "prix_unitaire",
             "client_id",
             "date_creation",
             "derniere_mise_a_jour",
         )
+        extra_kwargs = {
+            'type_matiere': {'required': True},
+            'description': {'required': False},
+            'prix_unitaire': {'required': False},
+            'client_id': {'required': True}
+        }
         read_only_fields = ("date_creation", "derniere_mise_a_jour")
 
 
