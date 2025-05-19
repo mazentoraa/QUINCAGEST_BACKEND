@@ -40,8 +40,10 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class TraveauxSerializer(serializers.ModelSerializer):
-    client_id = serializers.IntegerField(write_only=True)
-    produit_id = serializers.IntegerField(write_only=True)
+    client_id = serializers.IntegerField()
+    produit_id = serializers.IntegerField()
+    client_name = serializers.CharField(source='client.nom_client', read_only=True)
+    produit_name = serializers.CharField(source='produit.nom_produit', read_only=True)
 
     class Meta:
         model = Traveaux
@@ -49,13 +51,15 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "id",
             "client_id",
             "produit_id",
+            "client_name",
+            "produit_name",
             "duree",
             "quantite",
             "description",
             "date_creation",
             "derniere_mise_a_jour",
         )
-        read_only_fields = ("date_creation", "derniere_mise_a_jour")
+        read_only_fields = ("date_creation", "derniere_mise_a_jour", "client_name", "produit_name")
         extra_kwargs = {
             'duree': {'required': True},
             'quantite': {'required': True}

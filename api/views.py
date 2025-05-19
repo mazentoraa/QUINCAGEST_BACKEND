@@ -129,6 +129,40 @@ class ClientViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
 
+class ProduitViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing products
+    """
+
+    permission_classes = [IsAdminUser]
+    queryset = Produit.objects.all().order_by("date_creation")
+    serializer_class = ProduitSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def perform_update(self, serializer):
+        serializer.save()
+
+    @action(detail=False, methods=["get"])
+    def search(self, request):
+        """
+        Search products by name or description
+        """
+        query = request.query_params.get("query", None)
+        if not query:
+            return Response(
+                {"message": "Le paramètre de recherche est obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        products = self.queryset.filter(
+            Q(nom_produit__icontains=query) | Q(description__icontains=query)
+        )
+
+        serializer = self.get_serializer(products, many=True)
+        return Response(serializer.data)
+
 class AdminLoginView(APIView):
     permission_classes = []
 
