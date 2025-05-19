@@ -103,6 +103,27 @@ class Matiere(models.Model):
     description = models.TextField(
         blank=True, null=True, help_text="Material description"
     )
+    epaisser = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Thickness of the material in mm",
+        null=True,
+        blank=True,
+    )
+    longueur = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Length of the material in mm",
+        null=True,
+        blank=True,
+    )
+    surface = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Surface area of the material in m²",
+        null=True,
+        blank=True,
+    )
     prix_unitaire = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -136,17 +157,58 @@ class Matiere(models.Model):
 
 
 class Produit(models.Model):
+    
     nom_produit = models.CharField(max_length=255, help_text="Product name")
     description = models.TextField(
         blank=True, null=True, help_text="Product description"
+    )
+    type_matiere = models.CharField(
+        max_length=50,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+        help_text="Material type",
     )
     prix = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         help_text="Product price",
+        null=True,
+        blank=True,
     )
-    quantite_en_stock = models.PositiveIntegerField(
-        default=0, help_text="Quantity in stock"
+    image = models.ImageField(
+        upload_to="produits/",
+        blank=True,
+        null=True,
+        help_text="Product image",
+    )
+    epaisseur = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Thickness of the product in mm",
+        null=True,
+        blank=True,
+    )
+    longueur = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Length of the product in mm",
+        null=True,
+        blank=True,
+    )
+    surface = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Surface area of the product in m²",
+        null=True,
+        blank=True,
     )
     date_creation = models.DateTimeField(
         auto_now_add=True, help_text="Date when the product was created"
