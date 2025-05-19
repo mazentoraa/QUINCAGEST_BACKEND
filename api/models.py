@@ -110,7 +110,9 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock") # starting quantity
+    quantite = models.PositiveIntegerField(
+        default=0, help_text="Quantity in stock"
+    )  # starting quantity
     remaining_quantity = models.PositiveIntegerField(
         default=0, help_text="Remaining quantity after work"
     )
@@ -123,6 +125,14 @@ class Matiere(models.Model):
 
     def __str__(self):
         return f"{self.type_matiere} - {self.client.nom_client}"
+
+    def update_quantity_after_usage(self, amount_used):
+        """Update quantity after usage in a work"""
+        if self.remaining_quantity >= amount_used:
+            self.remaining_quantity -= amount_used
+            self.save()
+            return True
+        return False
 
 
 class Produit(models.Model):
@@ -175,6 +185,20 @@ class MatiereUsage(models.Model):
 
     def __str__(self):
         return f"{self.matiere} - {self.quantite_utilisee} units for {self.travaux}"
+
+    def save(self, *args, **kwargs):
+        # Check if this is a new instance being created
+        if not self.pk:
+            # Update material quantity
+            success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
+            if not success:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    f"Insufficient quantity available for {self.matiere}. "
+                    f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
+                )
+        super().save(*args, **kwargs)
 
 
 class Traveaux(models.Model):
