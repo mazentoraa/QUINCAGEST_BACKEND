@@ -1,7 +1,16 @@
 changes here!
 
 git checkout main 
-git pull
+
+git pull origin main
+
 git checkout fatima
-git rebase main
-git push --force origin fatima 
+
+git rebase main # combinaison 
+
+git push --force origin fatima # a la fin!
+
+# create pull request on dashboard!
+
+->Ok Maryem from branch pull request
+->Ok Fatima from branch pull request

@@ -110,7 +110,7 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock")
+    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock") # starting quantity
     remaining_quantity = models.PositiveIntegerField(
         default=0, help_text="Remaining quantity after work"
     )
