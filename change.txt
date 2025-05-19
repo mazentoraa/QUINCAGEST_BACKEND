@@ -1,1 +1,7 @@
 changes here!
+
+git checkout main 
+git pull
+git checkout fatima
+git rebase main
+git push --force origin fatima 
