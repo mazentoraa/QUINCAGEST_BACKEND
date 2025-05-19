@@ -80,3 +80,104 @@ class Client(models.Model):
 
     def __str__(self):
         return self.nom_client
+
+
+class Matiere(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="matieres", help_text="Client"
+    )
+    type_matiere = models.CharField(
+        max_length=50,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+        help_text="Material type",
+    )
+    description = models.TextField(
+        blank=True, null=True, help_text="Material description"
+    )
+    prix_unitaire = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Unit price of the material",
+    )
+    quantite_en_stock = models.PositiveIntegerField(
+        default=0, help_text="Quantity in stock"
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the material was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the material was last updated"
+    )
+
+
+class Produit(models.Model):
+    nom_produit = models.CharField(max_length=255, help_text="Product name")
+    description = models.TextField(
+        blank=True, null=True, help_text="Product description"
+    )
+    prix = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Product price",
+    )
+    quantite_en_stock = models.PositiveIntegerField(
+        default=0, help_text="Quantity in stock"
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the product was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the product was last updated"
+    )
+
+    class Meta:
+        ordering = ["nom_produit"]
+        indexes = [
+            models.Index(fields=["nom_produit"]),
+            models.Index(fields=["prix"]),
+        ]
+
+    def __str__(self):
+        return self.nom_produit
+
+
+class Traveaux(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="travaux", help_text="Client"
+    )
+    produit = models.ForeignKey(
+        Produit, on_delete=models.CASCADE, related_name="travaux", help_text="Product"
+    )
+    duree = models.PositiveIntegerField(
+        help_text="Duration of the work in hours",
+    )
+    quantite = models.FloatField(
+        default=1, help_text="Quantity of the product used for the work"
+    )
+    description = models.TextField(blank=True, null=True, help_text="Work description")
+
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the work was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the work was last updated"
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["client"]),
+            models.Index(fields=["produit"]),
+            models.Index(fields=["duree"]),
+        ]
+
+    def __str__(self):
+        return f"Travail pour {self.client.nom_client} - {self.produit.nom_produit}"
