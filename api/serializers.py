@@ -14,6 +14,7 @@ class MatiereSerializer(serializers.ModelSerializer):
             "prix_unitaire",
             "client_id",
             "date_creation",
+            "quantite",
             "derniere_mise_a_jour",
         )
         extra_kwargs = {

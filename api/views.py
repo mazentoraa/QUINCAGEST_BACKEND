@@ -75,6 +75,23 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         else:
             serializer.save()
 
+    @action(detail=False, methods=["get"])
+    def by_client(self, request):
+        """
+        Get works filtered by client
+        """
+        client_id = request.query_params.get("client_id")
+        if not client_id:
+            return Response(
+                {"message": "Le paramètre client_id est obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        travaux = self.queryset.filter(client_id=client_id)
+        serializer = self.get_serializer(travaux, many=True)
+        return Response(serializer.data)
+
+
 
 class ClientViewSet(viewsets.ModelViewSet):
     """

@@ -110,7 +110,7 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    quantite_en_stock = models.PositiveIntegerField(
+    quantite = models.PositiveIntegerField(
         default=0, help_text="Quantity in stock"
     )
     date_creation = models.DateTimeField(
