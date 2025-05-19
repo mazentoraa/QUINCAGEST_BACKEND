@@ -110,8 +110,9 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    quantite = models.PositiveIntegerField(
-        default=0, help_text="Quantity in stock"
+    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock")
+    remaining_quantity = models.PositiveIntegerField(
+        default=0, help_text="Remaining quantity after work"
     )
     date_creation = models.DateTimeField(
         auto_now_add=True, help_text="Date when the material was created"
@@ -119,6 +120,9 @@ class Matiere(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the material was last updated"
     )
+
+    def __str__(self):
+        return f"{self.type_matiere} - {self.client.nom_client}"
 
 
 class Produit(models.Model):
@@ -152,12 +156,39 @@ class Produit(models.Model):
         return self.nom_produit
 
 
+class MatiereUsage(models.Model):
+    travaux = models.ForeignKey(
+        "Traveaux",
+        on_delete=models.CASCADE,
+        related_name="matiere_usages",
+        help_text="Work",
+    )
+    matiere = models.ForeignKey(
+        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material"
+    )
+    quantite_utilisee = models.PositiveIntegerField(
+        default=1, help_text="Quantity used in the work"
+    )
+
+    class Meta:
+        unique_together = ("travaux", "matiere")
+
+    def __str__(self):
+        return f"{self.matiere} - {self.quantite_utilisee} units for {self.travaux}"
+
+
 class Traveaux(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="travaux", help_text="Client"
     )
     produit = models.ForeignKey(
         Produit, on_delete=models.CASCADE, related_name="travaux", help_text="Product"
+    )
+    matieres = models.ManyToManyField(
+        Matiere,
+        through=MatiereUsage,
+        related_name="travaux",
+        help_text="Materials used",
     )
     duree = models.PositiveIntegerField(
         help_text="Duration of the work in hours",

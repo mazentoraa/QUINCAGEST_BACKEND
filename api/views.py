@@ -3,17 +3,19 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Client, Traveaux, Produit, Matiere
+from .models import Client, Traveaux, Produit, Matiere, MatiereUsage
 from .serializers import (
     ClientSerializer,
     TraveauxSerializer,
     ProduitSerializer,
     MatiereSerializer,
+    MatiereUsageSerializer,
 )
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate
 from rest_framework.authtoken.models import Token
+from django.db import transaction
 
 
 class MatiereViewSet(viewsets.ModelViewSet):
@@ -62,6 +64,25 @@ class TraveauxViewSet(viewsets.ModelViewSet):
     queryset = Traveaux.objects.all().order_by("date_creation")
     serializer_class = TraveauxSerializer
 
+    def get_queryset(self):
+        """
+        Override to include matiere usage data in response
+        """
+        return self.queryset.prefetch_related('matiere_usages__matiere')
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        """
+        Override to restore material quantities when a work is deleted
+        """
+        # Restore material quantities
+        for usage in instance.matiere_usages.all():
+            matiere = usage.matiere
+            matiere.remaining_quantity += usage.quantite_utilisee
+            matiere.save()
+            
+        instance.delete()
+
     def perform_create(self, serializer):
         client_id = self.request.data.get("client_id")
         produit_id = self.request.data.get("produit_id")
@@ -87,10 +108,9 @@ class TraveauxViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        travaux = self.queryset.filter(client_id=client_id)
+        travaux = self.get_queryset().filter(client_id=client_id)
         serializer = self.get_serializer(travaux, many=True)
         return Response(serializer.data)
-
 
 
 class ClientViewSet(viewsets.ModelViewSet):
