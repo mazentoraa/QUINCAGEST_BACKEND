@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Client, Traveaux, Produit, Matiere, MatiereUsage
+from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 
 
@@ -16,22 +17,41 @@ class MatiereSerializer(serializers.ModelSerializer):
             "client_id",
             "date_creation",
             "quantite",
+            "remaining_quantity",
             "derniere_mise_a_jour",
+            "width",
+            "length",
+            "thickness",
+            "surface",
         )
         extra_kwargs = {
-            'type_matiere': {'required': True},
-            'description': {'required': False},
-            'prix_unitaire': {'required': False},
-            'client_id': {'required': True}
+            "type_matiere": {"required": True},
+            "description": {"required": False},
+            "prix_unitaire": {"required": False},
+            "client_id": {"required": True},
         }
         read_only_fields = ("date_creation", "derniere_mise_a_jour")
 
 
 class ProduitSerializer(serializers.ModelSerializer):
+    # Optional: Use Base64ImageField for easier image uploads via API
+    image = Base64ImageField(required=False)
+
     class Meta:
         model = Produit
-        fields = "__all__"
-        read_only_fields = ("date_creation", "derniere_mise_a_jour")
+        fields = [
+            "id",
+            "nom_produit",
+            "description",
+            "type_matiere",
+            "prix",
+            "image",
+            "epaisseur",
+            "longueur",
+            "surface",
+            "date_creation",
+            "derniere_mise_a_jour",
+        ]
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -43,17 +63,17 @@ class ClientSerializer(serializers.ModelSerializer):
 
 class MatiereUsageSerializer(serializers.ModelSerializer):
     matiere_id = serializers.IntegerField()
-    
+
     class Meta:
         model = MatiereUsage
-        fields = ('matiere_id', 'quantite_utilisee')
+        fields = ("matiere_id", "quantite_utilisee")
 
 
 class TraveauxSerializer(serializers.ModelSerializer):
     client_id = serializers.IntegerField()
     produit_id = serializers.IntegerField()
-    client_name = serializers.CharField(source='client.nom_client', read_only=True)
-    produit_name = serializers.CharField(source='produit.nom_produit', read_only=True)
+    client_name = serializers.CharField(source="client.nom_client", read_only=True)
+    produit_name = serializers.CharField(source="produit.nom_produit", read_only=True)
     matiere_usages = MatiereUsageSerializer(many=True, required=False)
 
     class Meta:
@@ -70,18 +90,20 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "date_creation",
             "matiere_usages",  # Ce champ doit être explicitement listé ici
             "derniere_mise_a_jour",
-        ]
-        read_only_fields = ("date_creation", "derniere_mise_a_jour", "client_name", "produit_name")
-        extra_kwargs = {
-            'duree': {'required': True},
-            'quantite': {'required': True}
-        }
+        )
+        read_only_fields = (
+            "date_creation",
+            "derniere_mise_a_jour",
+            "client_name",
+            "produit_name",
+        )
+        extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True}}
     @transaction.atomic
     def create(self, validated_data):
         client_id = validated_data.pop("client_id")
         produit_id = validated_data.pop("produit_id")
-        matiere_usages_data = validated_data.pop('matiere_usages', [])
-        
+        matiere_usages_data = validated_data.pop("matiere_usages", [])
+
         try:
             client = Client.objects.get(pk=client_id)
             produit = Produit.objects.get(pk=produit_id)
@@ -91,56 +113,56 @@ class TraveauxSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Client or Product not found")
 
         travaux = Traveaux.objects.create(**validated_data)
-        
+
         # Process material usage
         for matiere_usage_data in matiere_usages_data:
-            matiere_id = matiere_usage_data.get('matiere_id')
-            quantite_utilisee = matiere_usage_data.get('quantite_utilisee')
-            
+            matiere_id = matiere_usage_data.get("matiere_id")
+            quantite_utilisee = matiere_usage_data.get("quantite_utilisee")
+
             try:
                 matiere = Matiere.objects.get(pk=matiere_id)
-                
-                # Vérifier si la matière appartient au bon client
-                if matiere.client_id != client_id:
-                    raise serializers.ValidationError(f"Le matériel avec ID {matiere_id} n'appartient pas au client sélectionné.")
-                
-                # Check if we have enough quantity - important: compare with remaining_quantity
+
+                # Check if we have enough quantity
                 if matiere.remaining_quantity < quantite_utilisee:
-                    raise serializers.ValidationError(f"Quantité insuffisante de matériel. Seulement {matiere.remaining_quantity} unités de {matiere.type_matiere} disponibles.")
-                
+                    raise serializers.ValidationError(
+                        f"Not enough material available. Only {matiere.remaining_quantity} units of {matiere.type_matiere} remaining."
+                    )
+
                 # Create the usage record
                 MatiereUsage.objects.create(
                     travaux=travaux,
                     matiere=matiere,
-                    quantite_utilisee=quantite_utilisee
+                    quantite_utilisee=quantite_utilisee,
                 )
-                
-                # Update the remaining quantity
-                matiere.remaining_quantity = matiere.remaining_quantity - quantite_utilisee
-                matiere.save(update_fields=['remaining_quantity'])
-                
+
+
+                matiere.remaining_quantity -= quantite_utilisee
+                matiere.save()
+
             except Matiere.DoesNotExist:
-                raise serializers.ValidationError(f"Matériel avec ID {matiere_id} introuvable")
-        
+                raise serializers.ValidationError(
+                    f"Material with ID {matiere_id} not found"
+                )
+
         return travaux
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        if 'matiere_usages' in validated_data:
-            matiere_usages_data = validated_data.pop('matiere_usages')
-            
+        if "matiere_usages" in validated_data:
+            matiere_usages_data = validated_data.pop("matiere_usages")
+
             # Reset quantities for existing usages first
             for usage in instance.matiere_usages.all():
                 matiere = usage.matiere
                 matiere.remaining_quantity = matiere.remaining_quantity + usage.quantite_utilisee
                 matiere.save(update_fields=['remaining_quantity'])
                 usage.delete()
-            
+
             # Add new usages
             client_id = instance.client_id  # Utiliser l'ID client existant
             for matiere_usage_data in matiere_usages_data:
-                matiere_id = matiere_usage_data.get('matiere_id')
-                quantite_utilisee = matiere_usage_data.get('quantite_utilisee')
+                matiere_id = matiere_usage_data.get("matiere_id")
+                quantite_utilisee = matiere_usage_data.get("quantite_utilisee")
                 try:
                     matiere = Matiere.objects.get(pk=matiere_id)
                     
@@ -150,15 +172,18 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
                     # Check if we have enough quantity
                     if matiere.remaining_quantity < quantite_utilisee:
-                        raise serializers.ValidationError(f"Quantité insuffisante de matériel. Seulement {matiere.remaining_quantity} unités de {matiere.type_matiere} disponibles.")
-                    
+
+                        raise serializers.ValidationError(
+                            f"Not enough material available. Only {matiere.remaining_quantity} units of {matiere.type_matiere} remaining."
+                        )
+
                     # Create the usage record
                     MatiereUsage.objects.create(
                         travaux=instance,
                         matiere=matiere,
-                        quantite_utilisee=quantite_utilisee
+                        quantite_utilisee=quantite_utilisee,
                     )
-                    
+
                     # Update the remaining quantity
                     matiere.remaining_quantity = matiere.remaining_quantity - quantite_utilisee
                     matiere.save(update_fields=['remaining_quantity'])
@@ -172,3 +197,12 @@ class TraveauxSerializer(serializers.ModelSerializer):
         
         instance.save()
         return instance
+                    matiere.remaining_quantity -= quantite_utilisee
+                    matiere.save()
+
+                except Matiere.DoesNotExist:
+                    raise serializers.ValidationError(
+                        f"Material with ID {matiere_id} not found"
+                    )
+
+        return super().update(instance, validated_data)

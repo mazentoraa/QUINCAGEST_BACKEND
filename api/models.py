@@ -103,6 +103,34 @@ class Matiere(models.Model):
     description = models.TextField(
         blank=True, null=True, help_text="Material description"
     )
+    thickness = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Thickness of the material in mm",
+        null=True,
+        blank=True,
+    )
+    length = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Length of the material in mm",
+        null=True,
+        blank=True,
+    )
+    width = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Width of the material in mm",
+        null=True,
+        blank=True,
+    )
+    surface = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Surface area of the material in m²",
+        null=True,
+        blank=True,
+    )
     prix_unitaire = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -110,7 +138,9 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock") # starting quantity
+    quantite = models.PositiveIntegerField(
+        default=0, help_text="Quantity in stock"
+    )  # starting quantity
     remaining_quantity = models.PositiveIntegerField(
         default=0, help_text="Remaining quantity after work"
     )
@@ -124,19 +154,74 @@ class Matiere(models.Model):
     def __str__(self):
         return f"{self.type_matiere} - {self.client.nom_client}"
 
+    def save(self, *args, **kwargs):
+        # If this is a new instance or remaining_quantity wasn't explicitly set
+        if not self.pk or self.remaining_quantity == 0:
+            self.remaining_quantity = self.quantite
+        super().save(*args, **kwargs)
+
+    def update_quantity_after_usage(self, amount_used):
+        """Update quantity after usage in a work"""
+        if self.remaining_quantity >= amount_used:
+            self.remaining_quantity -= amount_used
+            self.save()
+            return True
+        return False
+
 
 class Produit(models.Model):
+    
     nom_produit = models.CharField(max_length=255, help_text="Product name")
     description = models.TextField(
         blank=True, null=True, help_text="Product description"
+    )
+    type_matiere = models.CharField(
+        max_length=50,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+        help_text="Material type",
     )
     prix = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         help_text="Product price",
+        null=True,
+        blank=True,
     )
-    quantite_en_stock = models.PositiveIntegerField(
-        default=0, help_text="Quantity in stock"
+    image = models.ImageField(
+        upload_to="produits/",
+        blank=True,
+        null=True,
+        help_text="Product image",
+    )
+    epaisseur = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        help_text="Thickness of the product in mm",
+        null=True,
+        blank=True,
+    )
+    longueur = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Length of the product in mm",
+        null=True,
+        blank=True,
+    )
+    surface = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Surface area of the product in m²",
+        null=True,
+        blank=True,
     )
     date_creation = models.DateTimeField(
         auto_now_add=True, help_text="Date when the product was created"
@@ -175,6 +260,20 @@ class MatiereUsage(models.Model):
 
     def __str__(self):
         return f"{self.matiere} - {self.quantite_utilisee} units for {self.travaux}"
+
+    def save(self, *args, **kwargs):
+        # Check if this is a new instance being created
+        if not self.pk:
+            # Update material quantity
+            success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
+            if not success:
+                from django.core.exceptions import ValidationError
+
+                raise ValidationError(
+                    f"Insufficient quantity available for {self.matiere}. "
+                    f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
+                )
+        super().save(*args, **kwargs)
 
 
 class Traveaux(models.Model):

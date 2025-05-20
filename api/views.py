@@ -19,10 +19,11 @@ from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+
 class MatiereViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des matières premières.
-    
+
     Liste toutes les matières, crée de nouvelles matières, et modifie ou supprime les matières existantes.
     """
 
@@ -34,17 +35,17 @@ class MatiereViewSet(viewsets.ModelViewSet):
         operation_description="Récupérer les matières filtrées par client",
         manual_parameters=[
             openapi.Parameter(
-                'client_id', 
-                openapi.IN_QUERY, 
-                description="ID du client pour filtrer les matières", 
+                "client_id",
+                openapi.IN_QUERY,
+                description="ID du client pour filtrer les matières",
                 type=openapi.TYPE_INTEGER,
-                required=True
+                required=True,
             )
         ],
         responses={
             200: MatiereSerializer(many=True),
-            400: "Paramètre client_id manquant"
-        }
+            400: "Paramètre client_id manquant",
+        },
     )
     @action(detail=False, methods=["get"])
     def by_client(self, request):
@@ -77,7 +78,7 @@ class MatiereViewSet(viewsets.ModelViewSet):
 class TraveauxViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des travaux.
-    
+
     Liste tous les travaux, crée de nouveaux travaux, et modifie ou supprime les travaux existants.
     Les travaux sont liés à des clients, des produits, et peuvent utiliser différentes matières.
     """
@@ -90,7 +91,7 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         """
         Override to include matiere usage data in response
         """
-        return self.queryset.prefetch_related('matiere_usages__matiere')
+        return self.queryset.prefetch_related("matiere_usages__matiere")
 
     @transaction.atomic
     def perform_destroy(self, instance):
@@ -102,7 +103,7 @@ class TraveauxViewSet(viewsets.ModelViewSet):
             matiere = usage.matiere
             matiere.remaining_quantity += usage.quantite_utilisee
             matiere.save()
-            
+
         instance.delete()
 
     def perform_create(self, serializer):
@@ -114,7 +115,9 @@ class TraveauxViewSet(viewsets.ModelViewSet):
                 produit = Produit.objects.get(pk=produit_id)
                 serializer.save(client=client, produit=produit)
             except (Client.DoesNotExist, Produit.DoesNotExist):
-                raise ValidationError({"client_id": "Client not found", "produit_id": "Produit not found"})
+                raise ValidationError(
+                    {"client_id": "Client not found", "produit_id": "Produit not found"}
+                )
         else:
             serializer.save()
 
@@ -122,17 +125,17 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         operation_description="Récupérer les travaux filtrés par client",
         manual_parameters=[
             openapi.Parameter(
-                'client_id', 
-                openapi.IN_QUERY, 
-                description="ID du client pour filtrer les travaux", 
+                "client_id",
+                openapi.IN_QUERY,
+                description="ID du client pour filtrer les travaux",
                 type=openapi.TYPE_INTEGER,
-                required=True
+                required=True,
             )
         ],
         responses={
             200: TraveauxSerializer(many=True),
-            400: "Paramètre client_id manquant"
-        }
+            400: "Paramètre client_id manquant",
+        },
     )
     @action(detail=False, methods=["get"])
     def by_client(self, request):
@@ -154,7 +157,7 @@ class TraveauxViewSet(viewsets.ModelViewSet):
 class ClientViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des clients.
-    
+
     Liste tous les clients, crée de nouveaux clients, et modifie ou supprime les clients existants.
     """
 
@@ -166,17 +169,17 @@ class ClientViewSet(viewsets.ModelViewSet):
         operation_description="Rechercher des clients par nom ou numéro fiscal",
         manual_parameters=[
             openapi.Parameter(
-                'query', 
-                openapi.IN_QUERY, 
-                description="Texte à rechercher dans les noms de clients ou numéros fiscaux", 
+                "query",
+                openapi.IN_QUERY,
+                description="Texte à rechercher dans les noms de clients ou numéros fiscaux",
                 type=openapi.TYPE_STRING,
-                required=True
+                required=True,
             )
         ],
         responses={
             200: ClientSerializer(many=True),
-            400: "Paramètre de recherche manquant"
-        }
+            400: "Paramètre de recherche manquant",
+        },
     )
     @action(detail=False, methods=["get"])
     def search(self, request):
@@ -200,10 +203,7 @@ class ClientViewSet(viewsets.ModelViewSet):
     @swagger_auto_schema(
         operation_description="Créer un nouveau client",
         request_body=ClientSerializer,
-        responses={
-            201: ClientSerializer,
-            400: "Données invalides ou incomplètes"
-        }
+        responses={201: ClientSerializer, 400: "Données invalides ou incomplètes"},
     )
     def create(self, request, *args, **kwargs):
         """
@@ -220,10 +220,7 @@ class ClientViewSet(viewsets.ModelViewSet):
     @swagger_auto_schema(
         operation_description="Mettre à jour un client existant",
         request_body=ClientSerializer,
-        responses={
-            200: ClientSerializer,
-            400: "Données invalides ou incomplètes"
-        }
+        responses={200: ClientSerializer, 400: "Données invalides ou incomplètes"},
     )
     def update(self, request, *args, **kwargs):
         """
@@ -241,7 +238,7 @@ class ClientViewSet(viewsets.ModelViewSet):
 class ProduitViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des produits.
-    
+
     Liste tous les produits, crée de nouveaux produits, et modifie ou supprime les produits existants.
     """
 
@@ -249,44 +246,69 @@ class ProduitViewSet(viewsets.ModelViewSet):
     queryset = Produit.objects.all().order_by("date_creation")
     serializer_class = ProduitSerializer
 
-    def perform_create(self, serializer):
-        serializer.save()
+    @swagger_auto_schema(
+        operation_description="Créer un nouveau produit",
+        request_body=ProduitSerializer,
+        responses={201: ProduitSerializer, 400: "Données invalides ou incomplètes"},
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new product with validation
+        """
+        if not request.data.get("nom_produit"):
+            return Response(
+                {"message": "Le nom du produit est obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-    def perform_update(self, serializer):
-        serializer.save()
+        return super().create(request, *args, **kwargs)
 
     @swagger_auto_schema(
-        operation_description="Rechercher des produits par nom ou description",
+        operation_description="Mettre à jour un produit existant",
+        request_body=ProduitSerializer,
+        responses={200: ProduitSerializer, 400: "Données invalides ou incomplètes"},
+    )
+    def update(self, request, *args, **kwargs):
+        """
+        Update an existing product with validation
+        """
+        if not request.data.get("nom_produit"):
+            return Response(
+                {"message": "Le nom du produit est obligatoire"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().update(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Récupérer les produits filtrés par type de matière",
         manual_parameters=[
             openapi.Parameter(
-                'query', 
-                openapi.IN_QUERY, 
-                description="Texte à rechercher dans les noms ou descriptions de produits", 
+                "type_matiere",
+                openapi.IN_QUERY,
+                description="Type de matière pour filtrer les produits",
                 type=openapi.TYPE_STRING,
-                required=True
+                required=True,
             )
         ],
         responses={
             200: ProduitSerializer(many=True),
-            400: "Paramètre de recherche manquant"
-        }
+            400: "Paramètre type_matiere manquant",
+        },
     )
     @action(detail=False, methods=["get"])
-    def search(self, request):
+    def by_material_type(self, request):
         """
-        Search products by name or description
+        Get products filtered by material type
         """
-        query = request.query_params.get("query", None)
-        if not query:
+        type_matiere = request.query_params.get("type_matiere")
+        if not type_matiere:
             return Response(
-                {"message": "Le paramètre de recherche est obligatoire"},
+                {"message": "Le paramètre type_matiere est obligatoire"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        products = self.queryset.filter(
-            Q(nom_produit__icontains=query) | Q(description__icontains=query)
-        )
-
+        products = self.queryset.filter(type_matiere=type_matiere)
         serializer = self.get_serializer(products, many=True)
         return Response(serializer.data)
 
@@ -294,33 +316,36 @@ class ProduitViewSet(viewsets.ModelViewSet):
 class AdminLoginView(APIView):
     """
     API pour l'authentification des administrateurs.
-    
+
     Permet aux administrateurs de se connecter et d'obtenir un token d'authentification.
     """
+
     permission_classes = []
 
     @swagger_auto_schema(
         operation_description="Connexion administrateur et génération de token",
         request_body=openapi.Schema(
             type=openapi.TYPE_OBJECT,
-            required=['username', 'password'],
+            required=["username", "password"],
             properties={
-                'username': openapi.Schema(type=openapi.TYPE_STRING),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD),
-            }
+                "username": openapi.Schema(type=openapi.TYPE_STRING),
+                "password": openapi.Schema(
+                    type=openapi.TYPE_STRING, format=openapi.FORMAT_PASSWORD
+                ),
+            },
         ),
         responses={
             200: openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
-                    'token': openapi.Schema(type=openapi.TYPE_STRING),
-                    'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'username': openapi.Schema(type=openapi.TYPE_STRING),
-                    'is_admin': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                }
+                    "token": openapi.Schema(type=openapi.TYPE_STRING),
+                    "user_id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "username": openapi.Schema(type=openapi.TYPE_STRING),
+                    "is_admin": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                },
             ),
-            401: "Identifiants invalides ou utilisateur non administrateur"
-        }
+            401: "Identifiants invalides ou utilisateur non administrateur",
+        },
     )
     def post(self, request):
         username = request.data.get("username")
@@ -347,16 +372,15 @@ class AdminLoginView(APIView):
 class LogoutView(APIView):
     """
     API pour la déconnexion.
-    
+
     Supprime le token d'authentification actuel.
     """
+
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
         operation_description="Déconnexion et suppression du token",
-        responses={
-            200: "Déconnexion réussie"
-        }
+        responses={200: "Déconnexion réussie"},
     )
     def post(self, request):
         request.user.auth_token.delete()
@@ -368,9 +392,10 @@ class LogoutView(APIView):
 class CheckAuthView(APIView):
     """
     API pour vérifier l'authentification.
-    
+
     Vérifie si l'utilisateur est authentifié et renvoie ses informations.
     """
+
     permission_classes = [IsAuthenticated]
 
     @swagger_auto_schema(
@@ -379,13 +404,13 @@ class CheckAuthView(APIView):
             200: openapi.Schema(
                 type=openapi.TYPE_OBJECT,
                 properties={
-                    'authenticated': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                    'user_id': openapi.Schema(type=openapi.TYPE_INTEGER),
-                    'username': openapi.Schema(type=openapi.TYPE_STRING),
-                    'is_admin': openapi.Schema(type=openapi.TYPE_BOOLEAN),
-                }
+                    "authenticated": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                    "user_id": openapi.Schema(type=openapi.TYPE_INTEGER),
+                    "username": openapi.Schema(type=openapi.TYPE_STRING),
+                    "is_admin": openapi.Schema(type=openapi.TYPE_BOOLEAN),
+                },
             )
-        }
+        },
     )
     def get(self, request):
         return Response(
