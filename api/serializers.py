@@ -17,7 +17,12 @@ class MatiereSerializer(serializers.ModelSerializer):
             "client_id",
             "date_creation",
             "quantite",
+            "remaining_quantity",
             "derniere_mise_a_jour",
+            "width",
+            "length",
+            "thickness",
+            "surface",
         )
         extra_kwargs = {
             "type_matiere": {"required": True},
