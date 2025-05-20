@@ -78,7 +78,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Traveaux
-        fields = [
+        fields = (
             "id",
             "client_id",
             "produit_id",
@@ -88,7 +88,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "quantite",
             "description",
             "date_creation",
-            "matiere_usages",  # Ce champ doit être explicitement listé ici
+            "matiere_usages",
             "derniere_mise_a_jour",
         )
         read_only_fields = (
@@ -98,6 +98,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "produit_name",
         )
         extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True}}
+
     @transaction.atomic
     def create(self, validated_data):
         client_id = validated_data.pop("client_id")
@@ -135,7 +136,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
                     quantite_utilisee=quantite_utilisee,
                 )
 
-
+                # Update the remaining quantity
                 matiere.remaining_quantity -= quantite_utilisee
                 matiere.save()
 
@@ -146,7 +147,6 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
         return travaux
 
-    @transaction.atomic
     def update(self, instance, validated_data):
         if "matiere_usages" in validated_data:
             matiere_usages_data = validated_data.pop("matiere_usages")
@@ -154,25 +154,19 @@ class TraveauxSerializer(serializers.ModelSerializer):
             # Reset quantities for existing usages first
             for usage in instance.matiere_usages.all():
                 matiere = usage.matiere
-                matiere.remaining_quantity = matiere.remaining_quantity + usage.quantite_utilisee
-                matiere.save(update_fields=['remaining_quantity'])
+                matiere.remaining_quantity += usage.quantite_utilisee
+                matiere.save()
                 usage.delete()
 
             # Add new usages
-            client_id = instance.client_id  # Utiliser l'ID client existant
             for matiere_usage_data in matiere_usages_data:
                 matiere_id = matiere_usage_data.get("matiere_id")
                 quantite_utilisee = matiere_usage_data.get("quantite_utilisee")
                 try:
                     matiere = Matiere.objects.get(pk=matiere_id)
-                    
-                    # Vérifier si la matière appartient au bon client
-                    if matiere.client_id != client_id:
-                        raise serializers.ValidationError(f"Le matériel avec ID {matiere_id} n'appartient pas au client sélectionné.")
 
                     # Check if we have enough quantity
                     if matiere.remaining_quantity < quantite_utilisee:
-
                         raise serializers.ValidationError(
                             f"Not enough material available. Only {matiere.remaining_quantity} units of {matiere.type_matiere} remaining."
                         )
@@ -185,18 +179,6 @@ class TraveauxSerializer(serializers.ModelSerializer):
                     )
 
                     # Update the remaining quantity
-                    matiere.remaining_quantity = matiere.remaining_quantity - quantite_utilisee
-                    matiere.save(update_fields=['remaining_quantity'])
-                    
-                except Matiere.DoesNotExist:
-                    raise serializers.ValidationError(f"Matériel avec ID {matiere_id} introuvable")
-        
-        # Process other fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        
-        instance.save()
-        return instance
                     matiere.remaining_quantity -= quantite_utilisee
                     matiere.save()
 
