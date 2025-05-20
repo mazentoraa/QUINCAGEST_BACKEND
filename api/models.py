@@ -170,7 +170,6 @@ class Matiere(models.Model):
 
 
 class Produit(models.Model):
-    
     nom_produit = models.CharField(max_length=255, help_text="Product name")
     description = models.TextField(
         blank=True, null=True, help_text="Product description"
@@ -313,3 +312,130 @@ class Traveaux(models.Model):
 
     def __str__(self):
         return f"Travail pour {self.client.nom_client} - {self.produit.nom_produit}"
+
+
+class FactureTravaux(models.Model):
+    STATUT_CHOICES = [
+        ("draft", "Brouillon"),
+        ("sent", "Envoyée"),
+        ("paid", "Payée"),
+        ("cancelled", "Annulée"),
+    ]
+
+    numero_facture = models.CharField(
+        max_length=50, unique=True, help_text="Invoice number"
+    )
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="factures", help_text="Client"
+    )
+    travaux = models.ManyToManyField(
+        "Traveaux", related_name="factures", help_text="Work items included in invoice"
+    )
+
+    date_emission = models.DateField(help_text="Invoice generation date")
+    date_echeance = models.DateField(null=True, blank=True, help_text="Due date")
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="draft",
+        help_text="Invoice status",
+    )
+
+    tax_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=20.0, help_text="Tax rate percentage"
+    )
+    montant_ht = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Total amount excluding tax",
+    )
+    montant_tva = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Tax amount"
+    )
+    montant_ttc = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Total amount including tax",
+    )
+
+    date_generated = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the invoice was generated"
+    )
+    notes = models.TextField(
+        blank=True, null=True, help_text="Additional notes on the invoice"
+    )
+    conditions_paiement = models.TextField(
+        blank=True, null=True, help_text="Payment terms and conditions"
+    )
+
+    date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Last update date"
+    )
+
+    class Meta:
+        ordering = ["-date_emission", "-numero_facture"]
+        indexes = [
+            models.Index(fields=["numero_facture"]),
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_emission"]),
+            models.Index(fields=["statut"]),
+        ]
+
+    def __str__(self):
+        return f"Facture {self.numero_facture}"
+
+    def calculate_totals(self):
+        """Calculate invoice totals"""
+        if not self.pk:
+            return 0
+
+        total_ht = 0
+        for travail in self.travaux.all():
+            # Add product costs
+            if travail.produit.prix:
+                total_ht += float(travail.produit.prix) * travail.quantite
+
+            # Add material costs if they exist
+            for usage in travail.matiere_usages.all():
+                if usage.matiere.prix_unitaire:
+                    total_ht += (
+                        float(usage.matiere.prix_unitaire) * usage.quantite_utilisee
+                    )
+
+        self.montant_ht = total_ht
+        self.montant_tva = total_ht * (float(self.tax_rate) / 100)
+        self.montant_ttc = self.montant_ht + self.montant_tva
+        return self.montant_ttc
+
+    def save(self, *args, **kwargs):
+        if not self.pk:  # New instance
+            # Debug output to understand what's happening
+            print(
+                f"Saving invoice: client_id={getattr(self, 'client_id', None)}, client={getattr(self, 'client', None)}"
+            )
+
+            # More lenient check - if client_id exists, don't require client object
+            if not hasattr(self, "client_id") or (
+                not self.client_id
+                and (not hasattr(self, "client") or self.client is None)
+            ):
+                raise ValueError(
+                    f"Client is required (client_id: {getattr(self, 'client_id', None)}, client: {getattr(self, 'client', None)})"
+                )
+            if not self.date_emission:
+                raise ValueError("Date emission is required")
+            if not self.numero_facture:
+                raise ValueError("Numero facture is required")
+
+        is_new = self.pk is None
+        super().save(*args, **kwargs)  # First save to get an ID
+
+        if is_new or not self.montant_ht:  # Calculate totals after initial save
+            self.calculate_totals()
+            if self.montant_ht:  # Only save again if we have amounts to save
+                super().save(*args, **kwargs)
