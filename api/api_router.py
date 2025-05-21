@@ -10,7 +10,7 @@ from .views import (
     ProduitViewSet,
 )
 from .invoice_views import FactureTravauxViewSet
-
+from .facture_matiere_views import FactureMatiereViewSet
 
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
@@ -18,6 +18,7 @@ router.register(r"traveaux", TraveauxViewSet)
 router.register(r"matieres", MatiereViewSet)
 router.register(r"produits", ProduitViewSet)
 router.register(r"factures", FactureTravauxViewSet)
+router.register(r"factures-matieres", FactureMatiereViewSet)
 
 
 urlpatterns = [
