@@ -189,3 +189,10 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
+class EntrepriseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Entreprise
+        fields = "__all__"
+
+
+      

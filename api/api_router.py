@@ -8,8 +8,10 @@ from .views import (
     TraveauxViewSet,
     MatiereViewSet,
     ProduitViewSet,
+    EntrepriseViewSet
 )
 from .invoice_views import FactureTravauxViewSet
+from .installments_views import PlanTraiteViewSet, TraiteViewSet
 
 
 router = DefaultRouter()
@@ -18,6 +20,9 @@ router.register(r"traveaux", TraveauxViewSet)
 router.register(r"matieres", MatiereViewSet)
 router.register(r"produits", ProduitViewSet)
 router.register(r"factures", FactureTravauxViewSet)
+router.register(r'plans-traite', PlanTraiteViewSet)
+router.register(r'traites', TraiteViewSet)
+router.register(r'entreprises', EntrepriseViewSet)
 
 
 urlpatterns = [
