@@ -3,13 +3,15 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Q
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage
+from .models import Client, Traveaux, Produit, Matiere, MatiereUsage,Entreprise
 from .serializers import (
     ClientSerializer,
     TraveauxSerializer,
     ProduitSerializer,
     MatiereSerializer,
     MatiereUsageSerializer,
+    EntrepriseSerializer,
+    
 )
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.views import APIView
@@ -421,3 +423,49 @@ class CheckAuthView(APIView):
                 "is_admin": request.user.is_staff,
             }
         )
+
+class EntrepriseViewSet(viewsets.ModelViewSet):
+    """
+    API pour la gestion des entreprises.
+
+    Liste toutes les entreprises, crée de nouvelles entreprises, et modifie ou supprime les entreprises existantes.
+    """
+
+    permission_classes = [IsAdminUser]
+    queryset = Entreprise.objects.all().order_by("nom_entreprise")
+    serializer_class = EntrepriseSerializer
+
+
+    @swagger_auto_schema(
+        operation_description="Créer un nouvelle entreprise",
+        request_body=EntrepriseSerializer,
+        responses={201: EntrepriseSerializer, 400: "Données invalides ou incomplètes"},
+    )
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new client with validation
+        """
+        if not request.data.get("nom_entreprise") or not request.data.get("numero_fiscal"):
+            return Response(
+                {"message": "Le nom de l'entreprise et le numéro fiscal sont obligatoires"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().create(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Mettre à jour une entreprise existante",
+        request_body=EntrepriseSerializer,
+        responses={200: EntrepriseSerializer, 400: "Données invalides ou incomplètes"},
+    )
+    def update(self, request, *args, **kwargs):
+        """
+        Update an existing client with validation
+        """
+        if not request.data.get("nom_entreprise") or not request.data.get("numero_fiscal"):
+            return Response(
+                {"message": "Le nom de l'entreprise et le numéro fiscal sont obligatoires"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().update(request, *args, **kwargs) 
