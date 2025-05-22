@@ -88,6 +88,9 @@ class Matiere(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="matieres", help_text="Client"
     )
+    numero_bon = models.CharField(
+        max_length=50, unique=True, help_text="Material reception number"
+    )    
     type_matiere = models.CharField(
         max_length=50,
         choices=[
