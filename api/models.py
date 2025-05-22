@@ -448,7 +448,7 @@ class PlanTraite(models.Model):
     ]
     
     facture = models.OneToOneField(
-        FactureTravaux, on_delete=models.CASCADE help_text="Invoice"
+        FactureTravaux, on_delete=models.CASCADE, help_text="Invoice"
     )
     nombre_traite = models.PositiveIntegerField(help_text="Number of traitements")
     date_emission = models.DateField(auto_now_add=True ,help_text="Invoice generation date")
@@ -491,7 +491,7 @@ class PlanTraite(models.Model):
         
         super().save(*args, **kwargs)
 
-     def _create_traites(self):
+    def _create_traites(self):
         
         if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
             montant_par_traite = self.montant_total / self.nombre_traite
@@ -571,6 +571,9 @@ class Entreprise(models.Model):
         null=True,
         help_text="Logo de l'entreprise",
     )
+
+
+
     
     
     

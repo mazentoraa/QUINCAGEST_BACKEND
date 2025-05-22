@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage
+from .models import Client, Traveaux, Produit, Matiere, MatiereUsage,Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 
