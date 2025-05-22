@@ -8,18 +8,19 @@ class MatiereReceptionSerializer(serializers.Serializer):
     matiere_id = serializers.IntegerField()
     type_matiere = serializers.CharField(read_only=True)
     quantite = serializers.IntegerField(read_only=True)
-    prix_unitaire = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    surface = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    prix_unitaire = serializers.IntegerField(read_only=True)
+    surface = serializers.IntegerField(read_only=True)
 
 
 class FactureMatiereSerializer(serializers.ModelSerializer):
     client_details = serializers.SerializerMethodField()
     matieres_details = serializers.SerializerMethodField()
-    client = serializers.PrimaryKeyRelatedField(queryset=Client.objects.all(), write_only=True)
-
-    montant_ht = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    montant_tva = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    montant_ttc = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    client = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(), write_only=True
+    )
+    montant_ht = serializers.IntegerField(read_only=True)
+    montant_tva = serializers.IntegerField(read_only=True)
+    montant_ttc = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = FactureMatiere
@@ -71,7 +72,9 @@ class FactureMatiereSerializer(serializers.ModelSerializer):
 
         if not validated_data.get("numero_bon"):
             today = timezone.now().strftime("%Y%m%d")
-            count = FactureMatiere.objects.filter(numero_bon__startswith=f"MAT-{today}").count()
+            count = FactureMatiere.objects.filter(
+                numero_bon__startswith=f"MAT-{today}"
+            ).count()
             validated_data["numero_bon"] = f"MAT-{today}-{count + 1:03d}"
 
         facture = FactureMatiere.objects.create(client=client, **validated_data)

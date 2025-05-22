@@ -71,8 +71,10 @@ class Client(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the client was last updated"
     )
-    nom_raison_sociale = models.CharField(max_length=255, blank=True, null=True, help_text="Nom de la raison sociale")
-   
+    nom_raison_sociale = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
+    )
+
     class Meta:
         ordering = ["nom_client"]
         indexes = [
@@ -89,8 +91,12 @@ class Matiere(models.Model):
         Client, on_delete=models.CASCADE, related_name="matieres", help_text="Client"
     )
     numero_bon = models.CharField(
-        max_length=50, unique=True, help_text="Material reception number"
-    )    
+        max_length=50,
+        unique=True,
+        help_text="Material reception number",
+        null=True,
+        blank=True,
+    )
     type_matiere = models.CharField(
         max_length=50,
         choices=[
@@ -108,37 +114,27 @@ class Matiere(models.Model):
     description = models.TextField(
         blank=True, null=True, help_text="Material description"
     )
-    thickness = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
+    thickness = models.IntegerField(
         help_text="Thickness of the material in mm",
         null=True,
         blank=True,
     )
-    length = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    length = models.IntegerField(
         help_text="Length of the material in mm",
         null=True,
         blank=True,
     )
-    width = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    width = models.IntegerField(
         help_text="Width of the material in mm",
         null=True,
         blank=True,
     )
-    surface = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    surface = models.IntegerField(
         help_text="Surface area of the material in m²",
         null=True,
         blank=True,
     )
-    prix_unitaire = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    prix_unitaire = models.IntegerField(
         help_text="Unit price of the material",
         null=True,
         blank=True,
@@ -193,9 +189,7 @@ class Produit(models.Model):
         default="autre",
         help_text="Material type",
     )
-    prix = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    prix = models.IntegerField(
         help_text="Product price",
         null=True,
         blank=True,
@@ -206,23 +200,17 @@ class Produit(models.Model):
         null=True,
         help_text="Product image",
     )
-    epaisseur = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
+    epaisseur = models.IntegerField(
         help_text="Thickness of the product in mm",
         null=True,
         blank=True,
     )
-    longueur = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    longueur = models.IntegerField(
         help_text="Length of the product in mm",
         null=True,
         blank=True,
     )
-    surface = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    surface = models.IntegerField(
         help_text="Surface area of the product in m²",
         null=True,
         blank=True,
@@ -346,22 +334,14 @@ class FactureTravaux(models.Model):
         help_text="Invoice status",
     )
 
-    tax_rate = models.DecimalField(
-        max_digits=5, decimal_places=2, default=20.0, help_text="Tax rate percentage"
-    )
-    montant_ht = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
+    montant_ht = models.IntegerField(
         null=True,
         blank=True,
         help_text="Total amount excluding tax",
     )
-    montant_tva = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Tax amount"
-    )
-    montant_ttc = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    montant_tva = models.IntegerField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.IntegerField(
         null=True,
         blank=True,
         help_text="Total amount including tax",
@@ -445,100 +425,107 @@ class FactureTravaux(models.Model):
             if self.montant_ht:  # Only save again if we have amounts to save
                 super().save(*args, **kwargs)
 
+
 class PlanTraite(models.Model):
     STATUT_CHOICES = [
-        ('EN_COURS', 'En cours'),
-        ('PAYEE', 'payée'),
+        ("EN_COURS", "En cours"),
+        ("PAYEE", "payée"),
     ]
-    
+
     facture = models.OneToOneField(
         FactureTravaux, on_delete=models.CASCADE, help_text="Invoice"
     )
     nombre_traite = models.PositiveIntegerField(help_text="Number of traitements")
-    date_emission = models.DateField(auto_now_add=True ,help_text="Invoice generation date")
+    date_emission = models.DateField(
+        auto_now_add=True, help_text="Invoice generation date"
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUT_CHOICES,
         default="EN_COURS",
         help_text="Traite status",
     )
-    
-    date_premier_echeance = models.DateField(null=True, blank=True, help_text="Date of the first installment")
-    
-    periode = models.PositiveIntegerField(null=True, blank=True, help_text="Period between each milking")
 
-    montant_total = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+    date_premier_echeance = models.DateField(
+        null=True, blank=True, help_text="Date of the first installment"
+    )
+
+    periode = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Period between each milking"
+    )
+
+    montant_total = models.IntegerField(
         null=True,
         blank=True,
         help_text="Total amount",
     )
-    nom_raison_sociale = models.CharField(max_length=255, blank=True, null=True, help_text="Nom de la raison sociale")
-    matricule_fiscal = models.CharField(max_length=255, blank=True, null=True, help_text="Matricule fiscal")
-    
+    nom_raison_sociale = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
+    )
+    matricule_fiscal = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Matricule fiscal"
+    )
+
     class Meta:
-        ordering = ["-date_emission","date_premier_echeance"]
+        ordering = ["-date_emission", "date_premier_echeance"]
         indexes = [
             models.Index(fields=["facture"]),
             models.Index(fields=["date_emission"]),
             models.Index(fields=["date_premier_echeance"]),
             models.Index(fields=["status"]),
         ]
+
     def save(self, *args, **kwargs):
-        
         if not self.montant_total and self.facture_id:
             self.montant_total = self.facture.montant_ttc
-        
-        if not hasattr(self, '_traites_created') and self.pk:
+
+        if not hasattr(self, "_traites_created") and self.pk:
             self._create_traites()
-        
+
         super().save(*args, **kwargs)
 
     def _create_traites(self):
-        
         if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
             montant_par_traite = self.montant_total / self.nombre_traite
-            
+
             for i in range(self.nombre_traite):
                 if i == 0:
-                   date_echeance = self.date_premier_echeance
+                    date_echeance = self.date_premier_echeance
                 else:
-                   date_echeance = self.date_premier_echeance + timedelta(days=i * (self.periode or 30))
+                    date_echeance = self.date_premier_echeance + timedelta(
+                        days=i * (self.periode or 30)
+                    )
                 Traite.objects.create(
                     plan_traite=self,
                     date_echeance=self.date_echeance,
                     montant=montant_par_traite,
-                    status='NON_PAYEE'
+                    status="NON_PAYEE",
                 )
-            
+
             self._traites_created = True
 
+
 class Traite(models.Model):
-    STATUT_CHOICES = [
-        ('NON_PAYEE', 'Non payée'),
-        ('PAYEE', 'Payée')
-    ]
-    
+    STATUT_CHOICES = [("NON_PAYEE", "Non payée"), ("PAYEE", "Payée")]
+
     plan_traite = models.ForeignKey(
         PlanTraite, on_delete=models.CASCADE, related_name="traites", help_text="Traite"
     )
-    date_echeance = models.DateField(auto_now_add=True ,help_text="Invoice generation date")
+    date_echeance = models.DateField(
+        auto_now_add=True, help_text="Invoice generation date"
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUT_CHOICES,
         default="NON_PAYEE",
         help_text="Traite status",
     )
-    
-    montant = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
+
+    montant = models.IntegerField(
         null=True,
         blank=True,
         help_text="Total amount",
     )
-
 
     class Meta:
         ordering = ["-date_echeance"]
@@ -547,7 +534,8 @@ class Traite(models.Model):
             models.Index(fields=["date_echeance"]),
             models.Index(fields=["status"]),
         ]
-    
+
+
 class Entreprise(models.Model):
     nom_entreprise = models.CharField(max_length=255, help_text="Nom de l'entreprise")
     numero_fiscal = models.CharField(
@@ -564,7 +552,10 @@ class Entreprise(models.Model):
         help_text="Entreprise phone number",
     )
     email = models.EmailField(
-        blank=True, null=True, validators=[validate_email], help_text="Entreprise's email"
+        blank=True,
+        null=True,
+        validators=[validate_email],
+        help_text="Entreprise's email",
     )
     site_web = models.URLField(
         blank=True, null=True, help_text="Site web de l'entreprise"
@@ -576,28 +567,34 @@ class Entreprise(models.Model):
         help_text="Logo de l'entreprise",
     )
 
+
 class FactureMatiere(models.Model):
     numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="bons_reception", help_text="Client")
-    matieres = models.ManyToManyField(Matiere, related_name="bons_reception", help_text="Received materials")
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name="bons_reception",
+        help_text="Client",
+    )
+    matieres = models.ManyToManyField(
+        Matiere, related_name="bons_reception", help_text="Received materials"
+    )
     date_reception = models.DateField(help_text="Reception date")
     notes = models.TextField(blank=True, null=True, help_text="Additional notes")
 
-    tax_rate = models.DecimalField(
-        max_digits=5, decimal_places=2, default=20.0, help_text="Tax rate percentage"
+    tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
+    montant_ht = models.IntegerField(
+        null=True, blank=True, help_text="Total amount excluding tax"
     )
-    montant_ht = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total amount excluding tax"
-    )
-    montant_tva = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Tax amount"
-    )
-    montant_ttc = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total amount including tax"
+    montant_tva = models.IntegerField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.IntegerField(
+        null=True, blank=True, help_text="Total amount including tax"
     )
 
     date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
-    derniere_mise_a_jour = models.DateTimeField(auto_now=True, help_text="Last update date")
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Last update date"
+    )
 
     class Meta:
         ordering = ["-date_reception"]
@@ -633,8 +630,3 @@ class FactureMatiere(models.Model):
             self.calculate_totals()
             if self.montant_ht:
                 super().save(*args, **kwargs)
-
-    
-    
-
-

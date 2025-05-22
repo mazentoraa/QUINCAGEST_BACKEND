@@ -12,10 +12,8 @@ class MatiereUsageInvoiceSerializer(serializers.Serializer):
     nom_matiere = serializers.CharField(read_only=True)
     type_matiere = serializers.CharField(read_only=True)
     quantite_utilisee = serializers.FloatField()
-    prix_unitaire = serializers.DecimalField(
-        max_digits=10, decimal_places=2, read_only=True
-    )
-    total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    prix_unitaire = serializers.IntegerField(read_only=True)
+    total = serializers.IntegerField(read_only=True)
 
 
 class InvoiceItemSerializer(serializers.Serializer):
@@ -33,16 +31,10 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     client_details = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
-    total_ht = serializers.DecimalField(
-        source="montant_ht", max_digits=10, decimal_places=2, read_only=True
-    )
-    total_tax = serializers.DecimalField(
-        source="montant_tva", max_digits=10, decimal_places=2, read_only=True
-    )
-    total_ttc = serializers.DecimalField(
-        source="montant_ttc", max_digits=10, decimal_places=2, read_only=True
-    )
-    tax_rate = serializers.DecimalField(max_digits=5, decimal_places=2, required=True)
+    total_ht = serializers.IntegerField(source="montant_ht", read_only=True)
+    total_tax = serializers.IntegerField(source="montant_tva", read_only=True)
+    total_ttc = serializers.IntegerField(source="montant_ttc", read_only=True)
+    tax_rate = serializers.IntegerField(required=True)
     client = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.all(), write_only=True
     )
@@ -88,7 +80,9 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
                 "billable": {
                     "quantite": travaux.quantite,
                     "prix_unitaire": float(travaux.produit.prix or 0),
-                    "total_ht": float(travaux.quantite * (float(travaux.produit.prix) or 0.0)),
+                    "total_ht": float(
+                        travaux.quantite * (float(travaux.produit.prix) or 0.0)
+                    ),
                 },
                 "matiere_usages": [],
             }
