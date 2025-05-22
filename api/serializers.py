@@ -5,16 +5,23 @@ from django.db import transaction
 
 
 class MatiereSerializer(serializers.ModelSerializer):
-    client_id = serializers.IntegerField(write_only=True)
+ 
+    client_id = serializers.PrimaryKeyRelatedField(
+        queryset=Client.objects.all(),
+        source='client'
+    )
+    client_name = serializers.CharField(source='client.nom_client', read_only=True)
 
     class Meta:
         model = Matiere
         fields = (
             "id",
+            "numero_bon",
             "type_matiere",
+            "client_name",
+            "client_id",
             "description",
             "prix_unitaire",
-            "client_id",
             "date_creation",
             "quantite",
             "remaining_quantity",
@@ -28,9 +35,20 @@ class MatiereSerializer(serializers.ModelSerializer):
             "type_matiere": {"required": True},
             "description": {"required": False},
             "prix_unitaire": {"required": False},
-            "client_id": {"required": True},
+            "client_id": {"required": True}, 
+            "numero_bon": {
+                "required": False,
+                "allow_null": True,
+                "allow_blank": True
+            },
+            "quantite": {"required": True},
         }
-        read_only_fields = ("date_creation", "derniere_mise_a_jour")
+        read_only_fields = (
+            "date_creation",
+            "derniere_mise_a_jour",
+            "remaining_quantity",
+        )
+
 
 
 class ProduitSerializer(serializers.ModelSerializer):
