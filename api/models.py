@@ -114,6 +114,11 @@ class Matiere(models.Model):
     description = models.TextField(
         blank=True, null=True, help_text="Material description"
     )
+    reception_date = models.DateField(
+        help_text="Date of material reception",
+        null=True,
+        blank=True,
+    )
     thickness = models.IntegerField(
         help_text="Thickness of the material in mm",
         null=True,

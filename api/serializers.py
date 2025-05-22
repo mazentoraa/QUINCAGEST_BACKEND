@@ -18,6 +18,7 @@ class MatiereSerializer(serializers.ModelSerializer):
             "id",
             "numero_bon",
             "type_matiere",
+            "reception_date",
             "client_name",
             "client_id",
             "description",
