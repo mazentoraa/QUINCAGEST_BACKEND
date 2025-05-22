@@ -572,9 +572,64 @@ class Entreprise(models.Model):
         help_text="Logo de l'entreprise",
     )
 
+class FactureMatiere(models.Model):
+    numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="bons_reception", help_text="Client")
+    matieres = models.ManyToManyField(Matiere, related_name="bons_reception", help_text="Received materials")
+    date_reception = models.DateField(help_text="Reception date")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes")
 
+    tax_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=20.0, help_text="Tax rate percentage"
+    )
+    montant_ht = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total amount excluding tax"
+    )
+    montant_tva = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Tax amount"
+    )
+    montant_ttc = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True, help_text="Total amount including tax"
+    )
 
-    
+    date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
+    derniere_mise_a_jour = models.DateTimeField(auto_now=True, help_text="Last update date")
+
+    class Meta:
+        ordering = ["-date_reception"]
+        indexes = [
+            models.Index(fields=["numero_bon"]),
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_reception"]),
+        ]
+
+    def __str__(self):
+        return f"Bon de Livraison {self.numero_bon} - {self.client.nom_client}"
+
+    def calculate_totals(self):
+        """Calcul des montants HT, TVA et TTC"""
+        if not self.pk:
+            return 0
+
+        total_ht = 0
+        for matiere in self.matieres.all():
+            if matiere.prix_unitaire and matiere.quantite:
+                total_ht += float(matiere.prix_unitaire) * matiere.quantite
+
+        self.montant_ht = total_ht
+        self.montant_tva = total_ht * (float(self.tax_rate) / 100)
+        self.montant_ttc = self.montant_ht + self.montant_tva
+        return self.montant_ttc
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+
+        if is_new or not self.montant_ht:
+            self.calculate_totals()
+            if self.montant_ht:
+                super().save(*args, **kwargs)
+
     
     
 
