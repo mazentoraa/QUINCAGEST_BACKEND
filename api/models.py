@@ -423,7 +423,6 @@ class FactureTravaux(models.Model):
 
         super().save(*args, **kwargs)  # Save first (generates PK if new)
 
-
         if (is_new and self.travaux.exists()) or (
             not is_new and self.montant_ht is None
         ):  # Recalculate if new and travaux exist, or if totals are None
@@ -648,3 +647,80 @@ class FactureMatiere(models.Model):
             self.calculate_totals()
             if self.montant_ht:
                 super().save(*args, **kwargs)
+
+
+class BonRetour(models.Model):
+    """Model for material return BON DE RETOUR"""
+
+    numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name="bons_retour",
+        help_text="Client",
+    )
+    matieres = models.ManyToManyField(
+        Matiere,
+        through="MatiereRetour",
+        related_name="bons_retour",
+        help_text="Returned materials",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("draft", "Brouillon"),
+            ("sent", "Envoyée"),
+            ("completed", "Complété"),
+            ("cancelled", "Annulée"),
+        ],
+        default="draft",
+        help_text="Bon status",
+    )
+
+    date_reception = models.DateField(help_text="Reception date")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes")
+
+    date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Last update date"
+    )
+    date_retour = models.DateField(help_text="Return date")
+    date_emission = models.DateField(auto_now_add=True, help_text="Emission date")
+
+    class Meta:
+        ordering = ["-date_retour", "-numero_bon"]
+        indexes = [
+            models.Index(fields=["numero_bon"]),
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_retour"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"Bon Retour {self.numero_bon} - {self.client.nom_client}"
+
+    def save(self, *args, **kwargs):
+        # No financial calculations needed on save
+        super().save(*args, **kwargs)
+
+
+class MatiereRetour(models.Model):
+    bon_retour = models.ForeignKey(
+        "BonRetour", on_delete=models.CASCADE, related_name="matiere_retours"
+    )
+    matiere = models.ForeignKey(
+        Matiere, on_delete=models.CASCADE, related_name="retours"
+    )
+    quantite_retournee = models.PositiveIntegerField(
+        default=1, help_text="Quantity of material returned"
+    )
+
+    class Meta:
+        unique_together = ("bon_retour", "matiere")
+
+    def __str__(self):
+        return f"{self.quantite_retournee} of {self.matiere.type_matiere} for Bon Retour {self.bon_retour.numero_bon}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
