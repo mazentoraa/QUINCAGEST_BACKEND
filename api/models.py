@@ -415,11 +415,11 @@ class FactureTravaux(models.Model):
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
-        
+
         # If it's a new instance and totals are not pre-calculated,
         # they will be calculated after the first save if travaux are already linked (e.g. by admin).
         # However, typically totals are calculated after travaux are set.
-        if is_new and (self.montant_ht is None): # Only set to 0 if not provided
+        if is_new and (self.montant_ht is None):  # Only set to 0 if not provided
             self.montant_ht = 0
             self.montant_tva = 0
             self.montant_ttc = 0
@@ -429,14 +429,25 @@ class FactureTravaux(models.Model):
         # If totals were not pre-calculated or need recalculation (e.g. after travaux update)
         # The serializer will call calculate_totals explicitly after setting travaux.
         # This model save logic ensures totals are calculated if not set.
-        if (is_new and self.travaux.exists()) or (not is_new and self.montant_ht is None): # Recalculate if new and travaux exist, or if totals are None
+        if (is_new and self.travaux.exists()) or (
+            not is_new and self.montant_ht is None
+        ):  # Recalculate if new and travaux exist, or if totals are None
             self.calculate_totals()
             # Save again only if totals were calculated and are non-zero or if they changed.
             # To avoid recursion, use update_fields if possible or a flag.
             # For simplicity, the serializer will handle the explicit calculation and save.
             # This part of model's save can be a fallback.
-            if self.montant_ht is not None: # Check if calculate_totals actually set something
-                 super().save(update_fields=['montant_ht', 'montant_tva', 'montant_ttc', 'derniere_mise_a_jour'])
+            if (
+                self.montant_ht is not None
+            ):  # Check if calculate_totals actually set something
+                super().save(
+                    update_fields=[
+                        "montant_ht",
+                        "montant_tva",
+                        "montant_ttc",
+                        "derniere_mise_a_jour",
+                    ]
+                )
 
 
 class PlanTraite(models.Model):
@@ -583,6 +594,7 @@ class Entreprise(models.Model):
 
 class FactureMatiere(models.Model):
     """Model for material reception BON DE RECEPTION"""
+
     numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
     client = models.ForeignKey(
         Client,

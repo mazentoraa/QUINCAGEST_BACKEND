@@ -67,41 +67,88 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             type=openapi.TYPE_OBJECT,
             required=["client", "line_items", "date_emission", "tax_rate"],
             properties={
-                "client": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the Client"),
+                "client": openapi.Schema(
+                    type=openapi.TYPE_INTEGER, description="ID of the Client"
+                ),
                 "line_items": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
                     items=openapi.Schema(
                         type=openapi.TYPE_OBJECT,
                         required=["work_id"],
                         properties={
-                            "work_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the Traveaux (work item)"),
-                            "produit_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the product (for reference)"),
-                            "produit_name": openapi.Schema(type=openapi.TYPE_STRING, description="Name of the product (for reference)"),
-                            "description_travail": openapi.Schema(type=openapi.TYPE_STRING, description="Description of the work (for reference)"),
-                            "quantite_produit": openapi.Schema(type=openapi.TYPE_NUMBER, description="Quantity of the product used (for reference)"),
-                            "prix_unitaire_produit": openapi.Schema(type=openapi.TYPE_NUMBER, description="Unit price of product (for reference)"),
+                            "work_id": openapi.Schema(
+                                type=openapi.TYPE_INTEGER,
+                                description="ID of the Traveaux (work item)",
+                            ),
+                            "produit_id": openapi.Schema(
+                                type=openapi.TYPE_INTEGER,
+                                description="ID of the product (for reference)",
+                            ),
+                            "produit_name": openapi.Schema(
+                                type=openapi.TYPE_STRING,
+                                description="Name of the product (for reference)",
+                            ),
+                            "description_travail": openapi.Schema(
+                                type=openapi.TYPE_STRING,
+                                description="Description of the work (for reference)",
+                            ),
+                            "quantite_produit": openapi.Schema(
+                                type=openapi.TYPE_NUMBER,
+                                description="Quantity of the product used (for reference)",
+                            ),
+                            "prix_unitaire_produit": openapi.Schema(
+                                type=openapi.TYPE_NUMBER,
+                                description="Unit price of product (for reference)",
+                            ),
                             "matiere_usages": openapi.Schema(
                                 type=openapi.TYPE_ARRAY,
                                 items=openapi.Schema(
                                     type=openapi.TYPE_OBJECT,
                                     properties={
-                                        "matiere_id": openapi.Schema(type=openapi.TYPE_INTEGER, description="ID of the material (for reference)"),
-                                        "nom_matiere": openapi.Schema(type=openapi.TYPE_STRING, description="Name of the material (for reference)"),
-                                        "type_matiere": openapi.Schema(type=openapi.TYPE_STRING, description="Type of the material (for reference)"),
-                                        "thickness": openapi.Schema(type=openapi.TYPE_INTEGER, description="Thickness (for reference)"),
-                                        "length": openapi.Schema(type=openapi.TYPE_INTEGER, description="Length (for reference)"),
-                                        "width": openapi.Schema(type=openapi.TYPE_INTEGER, description="Width (for reference)"),
-                                        "quantite_utilisee": openapi.Schema(type=openapi.TYPE_INTEGER, description="Quantity of material used (for reference)"),
-                                        "prix_unitaire": openapi.Schema(type=openapi.TYPE_NUMBER, description="Unit price of material (for reference)"),
-                                    }
+                                        "matiere_id": openapi.Schema(
+                                            type=openapi.TYPE_INTEGER,
+                                            description="ID of the material (for reference)",
+                                        ),
+                                        "nom_matiere": openapi.Schema(
+                                            type=openapi.TYPE_STRING,
+                                            description="Name of the material (for reference)",
+                                        ),
+                                        "type_matiere": openapi.Schema(
+                                            type=openapi.TYPE_STRING,
+                                            description="Type of the material (for reference)",
+                                        ),
+                                        "thickness": openapi.Schema(
+                                            type=openapi.TYPE_INTEGER,
+                                            description="Thickness (for reference)",
+                                        ),
+                                        "length": openapi.Schema(
+                                            type=openapi.TYPE_INTEGER,
+                                            description="Length (for reference)",
+                                        ),
+                                        "width": openapi.Schema(
+                                            type=openapi.TYPE_INTEGER,
+                                            description="Width (for reference)",
+                                        ),
+                                        "quantite_utilisee": openapi.Schema(
+                                            type=openapi.TYPE_INTEGER,
+                                            description="Quantity of material used (for reference)",
+                                        ),
+                                        "prix_unitaire": openapi.Schema(
+                                            type=openapi.TYPE_NUMBER,
+                                            description="Unit price of material (for reference)",
+                                        ),
+                                    },
                                 ),
-                                description="List of materials used for this work item (for reference)"
+                                description="List of materials used for this work item (for reference)",
                             ),
-                        }
+                        },
                     ),
-                    description="List of line items (work items) for the invoice."
+                    description="List of line items (work items) for the invoice.",
                 ),
-                "numero_facture": openapi.Schema(type=openapi.TYPE_STRING, description="Invoice number (optional, auto-generated if not provided)"),
+                "numero_facture": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    description="Invoice number (optional, auto-generated if not provided)",
+                ),
                 "date_emission": openapi.Schema(
                     type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE
                 ),
@@ -114,8 +161,16 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                     enum=["draft", "sent", "paid", "cancelled"],
                     default="draft",
                 ),
-                "notes": openapi.Schema(type=openapi.TYPE_STRING, nullable=True, description="Additional notes on the invoice"),
-                "conditions_paiement": openapi.Schema(type=openapi.TYPE_STRING, nullable=True, description="Payment terms and conditions"),
+                "notes": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    nullable=True,
+                    description="Additional notes on the invoice",
+                ),
+                "conditions_paiement": openapi.Schema(
+                    type=openapi.TYPE_STRING,
+                    nullable=True,
+                    description="Payment terms and conditions",
+                ),
             },
         ),
         responses={

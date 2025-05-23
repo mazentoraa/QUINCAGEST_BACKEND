@@ -36,7 +36,8 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     total_ttc = serializers.IntegerField(source="montant_ttc", read_only=True)
     tax_rate = serializers.IntegerField(required=True)
     client = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(), write_only=True  # Retained for writing client ID
+        queryset=Client.objects.all(),
+        write_only=True,  # Retained for writing client ID
     )
 
     class Meta:
@@ -113,24 +114,32 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
         line_items = self.context.get("line_items", [])
         if not line_items:
-            raise serializers.ValidationError({"line_items": "At least one line item is required."})
+            raise serializers.ValidationError(
+                {"line_items": "At least one line item is required."}
+            )
 
         travaux_ids = []
         for item in line_items:
             work_id = item.get("work_id")
             if work_id is None:
-                raise serializers.ValidationError({"line_items": "Each line item must have a 'work_id'."})
+                raise serializers.ValidationError(
+                    {"line_items": "Each line item must have a 'work_id'."}
+                )
             travaux_ids.append(work_id)
-        
+
         unique_travaux_ids = list(set(travaux_ids))
 
         travaux_list = Traveaux.objects.filter(id__in=unique_travaux_ids, client=client)
 
         if len(travaux_list) != len(unique_travaux_ids):
             found_ids = {t.id for t in travaux_list}
-            missing_or_mismatched_ids = [tid for tid in unique_travaux_ids if tid not in found_ids]
+            missing_or_mismatched_ids = [
+                tid for tid in unique_travaux_ids if tid not in found_ids
+            ]
             raise serializers.ValidationError(
-                {"line_items": f"Some work items not found, do not belong to this client, or were duplicated. Problematic work_ids: {missing_or_mismatched_ids}"}
+                {
+                    "line_items": f"Some work items not found, do not belong to this client, or were duplicated. Problematic work_ids: {missing_or_mismatched_ids}"
+                }
             )
 
         tax_rate = validated_data.get("tax_rate")
@@ -157,8 +166,10 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "conditions_paiement": validated_data.get("conditions_paiement"),
         }
         # Remove None values to avoid overriding model defaults if not provided
-        invoice_create_data = {k: v for k, v in invoice_create_data.items() if v is not None}
-        
+        invoice_create_data = {
+            k: v for k, v in invoice_create_data.items() if v is not None
+        }
+
         invoice = FactureTravaux(**invoice_create_data)
         invoice.save()  # Save to get PK
 
@@ -166,7 +177,14 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
         # Now call calculate_totals and save again
         invoice.calculate_totals()  # This will set montant_ht, montant_tva, montant_ttc on the instance
-        invoice.save(update_fields=['montant_ht', 'montant_tva', 'montant_ttc', 'derniere_mise_a_jour'])
+        invoice.save(
+            update_fields=[
+                "montant_ht",
+                "montant_tva",
+                "montant_ttc",
+                "derniere_mise_a_jour",
+            ]
+        )
 
         return invoice
 
