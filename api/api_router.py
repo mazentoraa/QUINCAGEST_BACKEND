@@ -20,6 +20,8 @@ from .bon_retour_views import (
     BonRetourByClientView,
     BonRetourStatsView,
 )
+from .devis_views import DevisViewSet
+from .commande_views import CommandeViewSet
 
 
 router = DefaultRouter()
@@ -31,9 +33,10 @@ router.register(r"factures", FactureTravauxViewSet)
 router.register(r"plans-traite", PlanTraiteViewSet)
 router.register(r"traites", TraiteViewSet)
 router.register(r"entreprises", EntrepriseViewSet)
-
 router.register(r"factures-matieres", FactureMatiereViewSet)
 router.register(r"bons-retour", BonRetourViewSet)
+router.register(r"devis", DevisViewSet)
+router.register(r"commandes", CommandeViewSet)
 
 
 urlpatterns = [

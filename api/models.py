@@ -724,3 +724,436 @@ class MatiereRetour(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+
+class ProduitDevis(models.Model):
+    """Through model to connect products with quotes (Devis) with additional information"""
+
+    devis = models.ForeignKey(
+        "Devis",
+        on_delete=models.CASCADE,
+        related_name="produit_devis",
+        help_text="Quote",
+    )
+    produit = models.ForeignKey(
+        Produit,
+        on_delete=models.CASCADE,
+        related_name="devis_produits",
+        help_text="Product",
+    )
+    quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
+    prix_unitaire = models.FloatField(
+        help_text="Unit price for this product",
+        null=True,
+        blank=True,
+    )
+    remise_pourcentage = models.FloatField(default=0, help_text="Discount percentage")
+    prix_total = models.FloatField(
+        null=True, blank=True, help_text="Total price for this product entry"
+    )
+
+    class Meta:
+        unique_together = ("devis", "produit")
+
+    def __str__(self):
+        return f"{self.produit.nom_produit} - {self.quantite} units for {self.devis}"
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate price if not specified
+        if self.prix_unitaire is None and self.produit.prix is not None:
+            self.prix_unitaire = self.produit.prix
+
+        # Calculate total price with discount
+        if self.prix_unitaire is not None:
+            discount_factor = 1 - (self.remise_pourcentage / 100)
+            self.prix_total = self.quantite * self.prix_unitaire * discount_factor
+
+        super().save(*args, **kwargs)
+
+        # Update the devis totals
+        self.devis.calculate_totals()
+        self.devis.save()
+
+
+class Devis(models.Model):
+    """Model for client quotes (Devis)"""
+
+    STATUT_CHOICES = [
+        ("draft", "Brouillon"),
+        ("sent", "Envoyé"),
+        ("accepted", "Accepté"),
+        ("rejected", "Rejeté"),
+        ("expired", "Expiré"),
+        ("converted", "Converti en commande"),
+    ]
+
+    numero_devis = models.CharField(
+        max_length=50, unique=True, help_text="Quote number"
+    )
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="devis", help_text="Client"
+    )
+    produits = models.ManyToManyField(
+        Produit,
+        through=ProduitDevis,
+        related_name="devis",
+        help_text="Products included in quote",
+    )
+
+    date_emission = models.DateField(help_text="Quote issue date")
+    date_validite = models.DateField(
+        help_text="Quote validity date (15 days after issue)"
+    )
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="draft",
+        help_text="Quote status",
+    )
+
+    tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
+    montant_ht = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount excluding tax",
+    )
+    montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount including tax",
+    )
+
+    remarques = models.TextField(
+        default="Remarques :\n_ Validité du devis : 15 jours.\n_ Ce devis doit être accepté et signé pour valider la commande",
+        help_text="Standard remarks on the quote",
+    )
+
+    notes = models.TextField(
+        blank=True, null=True, help_text="Additional notes on the quote"
+    )
+    conditions_paiement = models.TextField(
+        blank=True, null=True, help_text="Payment terms and conditions"
+    )
+
+    date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Last update date"
+    )
+
+    class Meta:
+        ordering = ["-date_emission", "-numero_devis"]
+        indexes = [
+            models.Index(fields=["numero_devis"]),
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_emission"]),
+            models.Index(fields=["statut"]),
+        ]
+
+    def __str__(self):
+        return f"Devis {self.numero_devis} - {self.client.nom_client}"
+
+    def calculate_totals(self):
+        """Calculate quote totals"""
+        if not self.pk:
+            # Instance not saved yet
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
+            return 0
+
+        # Total without tax
+        total_ht = sum(
+            item.prix_total
+            for item in self.produit_devis.all()
+            if item.prix_total is not None
+        )
+
+        self.montant_ht = total_ht
+        # Calculate tax
+        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
+        self.montant_tva = total_ht * (tax_rate_float / 100)
+        self.montant_ttc = self.montant_ht + self.montant_tva
+        return self.montant_ttc
+
+    def save(self, *args, **kwargs):
+        # Set validity date if not set (15 days from emission)
+        from datetime import timedelta
+
+        if self.date_emission and not self.date_validite:
+            self.date_validite = self.date_emission + timedelta(days=15)
+
+        is_new = self.pk is None
+        if is_new and (self.montant_ht is None):
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
+
+        super().save(*args, **kwargs)
+
+        # Calculate totals if needed
+        if (is_new and self.produits.exists()) or (
+            not is_new and self.montant_ht is None
+        ):
+            self.calculate_totals()
+            if self.montant_ht is not None:
+                super().save(
+                    update_fields=[
+                        "montant_ht",
+                        "montant_tva",
+                        "montant_ttc",
+                        "derniere_mise_a_jour",
+                    ]
+                )
+
+    def convert_to_commande(self):
+        """Convert this quote to an order if it's accepted"""
+        if self.statut != "accepted":
+            return None
+
+        commande = Commande.objects.create(
+            numero_commande=f"CMD-{self.numero_devis}",
+            client=self.client,
+            devis=self,
+            date_commande=self.derniere_mise_a_jour.date(),
+            statut="pending",
+            tax_rate=self.tax_rate,
+            montant_ht=self.montant_ht,
+            montant_tva=self.montant_tva,
+            montant_ttc=self.montant_ttc,
+            notes=self.notes,
+            conditions_paiement=self.conditions_paiement,
+        )
+
+        # Copy products from devis to commande
+        for produit_devis in self.produit_devis.all():
+            ProduitCommande.objects.create(
+                commande=commande,
+                produit=produit_devis.produit,
+                quantite=produit_devis.quantite,
+                prix_unitaire=produit_devis.prix_unitaire,
+                remise_pourcentage=produit_devis.remise_pourcentage,
+                prix_total=produit_devis.prix_total,
+            )
+
+        # Update the devis status
+        self.statut = "converted"
+        self.save(update_fields=["statut", "derniere_mise_a_jour"])
+
+        return commande
+
+
+class ProduitCommande(models.Model):
+    """Through model to connect products with orders (Commande) with additional information"""
+
+    commande = models.ForeignKey(
+        "Commande",
+        on_delete=models.CASCADE,
+        related_name="produit_commande",
+        help_text="Order",
+    )
+    produit = models.ForeignKey(
+        Produit,
+        on_delete=models.CASCADE,
+        related_name="commande_produits",
+        help_text="Product",
+    )
+    quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
+    prix_unitaire = models.FloatField(
+        help_text="Unit price for this product",
+        null=True,
+        blank=True,
+    )
+    remise_pourcentage = models.FloatField(default=0, help_text="Discount percentage")
+    prix_total = models.FloatField(
+        null=True, blank=True, help_text="Total price for this product entry"
+    )
+
+    class Meta:
+        unique_together = ("commande", "produit")
+
+    def __str__(self):
+        return f"{self.produit.nom_produit} - {self.quantite} units for {self.commande}"
+
+    def save(self, *args, **kwargs):
+        # Auto-calculate price if not specified
+        if self.prix_unitaire is None and self.produit.prix is not None:
+            self.prix_unitaire = self.produit.prix
+
+        # Calculate total price with discount
+        if self.prix_unitaire is not None:
+            discount_factor = 1 - (self.remise_pourcentage / 100)
+            self.prix_total = self.quantite * self.prix_unitaire * discount_factor
+
+        super().save(*args, **kwargs)
+
+        # Update the commande totals
+        self.commande.calculate_totals()
+        self.commande.save()
+
+
+class Commande(models.Model):
+    """Model for client orders (Commandes)"""
+
+    STATUT_CHOICES = [
+        ("pending", "En attente"),
+        ("processing", "En cours de traitement"),
+        ("completed", "Terminée"),
+        ("cancelled", "Annulée"),
+        ("invoiced", "Facturée"),
+    ]
+
+    numero_commande = models.CharField(
+        max_length=50, unique=True, help_text="Order number"
+    )
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="commandes", help_text="Client"
+    )
+    devis = models.OneToOneField(
+        Devis,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commande",
+        help_text="Associated quote",
+    )
+    produits = models.ManyToManyField(
+        Produit,
+        through=ProduitCommande,
+        related_name="commandes",
+        help_text="Products included in order",
+    )
+
+    date_commande = models.DateField(help_text="Order date")
+    date_livraison_prevue = models.DateField(
+        null=True, blank=True, help_text="Expected delivery date"
+    )
+    date_livraison_reelle = models.DateField(
+        null=True, blank=True, help_text="Actual delivery date"
+    )
+
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="pending",
+        help_text="Order status",
+    )
+
+    tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
+    montant_ht = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount excluding tax",
+    )
+    montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount including tax",
+    )
+
+    facture = models.OneToOneField(
+        FactureTravaux,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commande_associee",
+        help_text="Associated invoice",
+    )
+
+    notes = models.TextField(
+        blank=True, null=True, help_text="Additional notes on the order"
+    )
+    conditions_paiement = models.TextField(
+        blank=True, null=True, help_text="Payment terms and conditions"
+    )
+
+    date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Last update date"
+    )
+
+    class Meta:
+        ordering = ["-date_commande", "-numero_commande"]
+        indexes = [
+            models.Index(fields=["numero_commande"]),
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_commande"]),
+            models.Index(fields=["statut"]),
+        ]
+
+    def __str__(self):
+        return f"Commande {self.numero_commande} - {self.client.nom_client}"
+
+    def calculate_totals(self):
+        """Calculate order totals"""
+        if not self.pk:
+            # Instance not saved yet
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
+            return 0
+
+        # Total without tax
+        total_ht = sum(
+            item.prix_total
+            for item in self.produit_commande.all()
+            if item.prix_total is not None
+        )
+
+        self.montant_ht = total_ht
+        # Calculate tax
+        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
+        self.montant_tva = total_ht * (tax_rate_float / 100)
+        self.montant_ttc = self.montant_ht + self.montant_tva
+        return self.montant_ttc
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new and (self.montant_ht is None):
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
+
+        super().save(*args, **kwargs)
+
+        # Calculate totals if needed
+        if (is_new and self.produits.exists()) or (
+            not is_new and self.montant_ht is None
+        ):
+            self.calculate_totals()
+            if self.montant_ht is not None:
+                super().save(
+                    update_fields=[
+                        "montant_ht",
+                        "montant_tva",
+                        "montant_ttc",
+                        "derniere_mise_a_jour",
+                    ]
+                )
+
+    def generate_invoice(self):
+        """Generate an invoice for this order if it's completed"""
+        if self.statut != "completed" or self.facture is not None:
+            return None
+
+        # Create invoice
+        facture = FactureTravaux.objects.create(
+            numero_facture=f"FAC-{self.numero_commande}",
+            client=self.client,
+            date_emission=self.derniere_mise_a_jour.date(),
+            statut="draft",
+            tax_rate=self.tax_rate,
+            montant_ht=self.montant_ht,
+            montant_tva=self.montant_tva,
+            montant_ttc=self.montant_ttc,
+            notes=self.notes,
+            conditions_paiement=self.conditions_paiement,
+        )
+
+        # Link the invoice to the order
+        self.facture = facture
+        self.statut = "invoiced"
+        self.save(update_fields=["facture", "statut", "derniere_mise_a_jour"])
+
+        return facture
