@@ -36,7 +36,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     total_ttc = serializers.IntegerField(source="montant_ttc", read_only=True)
     tax_rate = serializers.IntegerField(required=True)
     client = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(), write_only=True
+        queryset=Client.objects.all(), write_only=True  # Retained for writing client ID
     )
 
     class Meta:
@@ -107,74 +107,66 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        print("Creating invoice with data:", validated_data)
-        travaux_ids = self.context.get("travaux_ids", [])
-        print("Travaux IDs:", travaux_ids)
-
-        # Get client from validated_data instead of context
-        client = validated_data.pop("client", None)
+        client = validated_data.get("client")
         if not client:
-            client_id = self.context.get("client_id")
-            print("Client ID from context:", client_id)
-            if not client_id:
-                raise serializers.ValidationError("Client ID is required")
+            raise serializers.ValidationError({"client": "Client is required."})
 
-            try:
-                client = Client.objects.get(pk=client_id)
-            except Client.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Client with ID {client_id} not found"
-                )
+        line_items = self.context.get("line_items", [])
+        if not line_items:
+            raise serializers.ValidationError({"line_items": "At least one line item is required."})
 
-        if not travaux_ids:
-            raise serializers.ValidationError("At least one work item is required")
+        travaux_ids = []
+        for item in line_items:
+            work_id = item.get("work_id")
+            if work_id is None:
+                raise serializers.ValidationError({"line_items": "Each line item must have a 'work_id'."})
+            travaux_ids.append(work_id)
+        
+        unique_travaux_ids = list(set(travaux_ids))
 
-        travaux_list = Traveaux.objects.filter(id__in=travaux_ids, client=client)
-        if len(travaux_list) != len(travaux_ids):
+        travaux_list = Traveaux.objects.filter(id__in=unique_travaux_ids, client=client)
+
+        if len(travaux_list) != len(unique_travaux_ids):
+            found_ids = {t.id for t in travaux_list}
+            missing_or_mismatched_ids = [tid for tid in unique_travaux_ids if tid not in found_ids]
             raise serializers.ValidationError(
-                "Some work items not found or do not belong to this client"
+                {"line_items": f"Some work items not found, do not belong to this client, or were duplicated. Problematic work_ids: {missing_or_mismatched_ids}"}
             )
 
-        # Calculate totals first
-        total_ht = 0
-        for travaux in travaux_list:
-            prix = travaux.produit.prix or 0
-            # Convert to float to ensure consistent type for multiplication
-            total_ht += float(travaux.quantite) * float(prix)
+        tax_rate = validated_data.get("tax_rate")
+        if tax_rate is None:
+            raise serializers.ValidationError({"tax_rate": "Tax rate is required."})
 
-        # Get tax rate
-        tax_rate = validated_data["tax_rate"]
-
-        # Calculate tax and total amounts
-        total_tax = float(total_ht) * (float(tax_rate) / 100)
-        total_ttc = total_ht + total_tax
-
-        # Generate a unique invoice number if not provided
-        if not validated_data.get("numero_facture"):
+        numero_facture = validated_data.get("numero_facture")
+        if not numero_facture:
             today = timezone.now().strftime("%Y%m%d")
             count = FactureTravaux.objects.filter(
                 numero_facture__startswith=f"INV-{today}"
             ).count()
-            validated_data["numero_facture"] = f"INV-{today}-{count + 1:03d}"
+            numero_facture = f"INV-{today}-{count + 1:03d}"
 
-        # Create and save the invoice with all data at once
-        invoice = FactureTravaux(
-            client=client,
-            date_emission=validated_data.get("date_emission", timezone.now().date()),
-            date_echeance=validated_data.get("date_echeance"),
-            statut=validated_data.get("statut", "draft"),
-            numero_facture=validated_data.get("numero_facture"),
-            tax_rate=tax_rate,
-            montant_ht=total_ht,
-            montant_tva=total_tax,
-            montant_ttc=total_ttc,
-        )
+        # Create invoice instance without totals initially
+        invoice_create_data = {
+            "client": client,
+            "date_emission": validated_data.get("date_emission", timezone.now().date()),
+            "date_echeance": validated_data.get("date_echeance"),
+            "statut": validated_data.get("statut", "draft"),
+            "numero_facture": numero_facture,
+            "tax_rate": tax_rate,
+            "notes": validated_data.get("notes"),
+            "conditions_paiement": validated_data.get("conditions_paiement"),
+        }
+        # Remove None values to avoid overriding model defaults if not provided
+        invoice_create_data = {k: v for k, v in invoice_create_data.items() if v is not None}
+        
+        invoice = FactureTravaux(**invoice_create_data)
+        invoice.save()  # Save to get PK
 
-        # Save first to get an ID before adding many-to-many relationships
-        invoice.save()
+        invoice.travaux.set(travaux_list)  # Set M2M relationship
 
-        # Now that we have a saved instance with an ID, set the many-to-many relationship
-        invoice.travaux.set(travaux_list)
+        # Now call calculate_totals and save again
+        invoice.calculate_totals()  # This will set montant_ht, montant_tva, montant_ttc on the instance
+        invoice.save(update_fields=['montant_ht', 'montant_tva', 'montant_ttc', 'derniere_mise_a_jour'])
 
         return invoice
 

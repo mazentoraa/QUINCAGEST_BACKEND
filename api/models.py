@@ -215,6 +215,11 @@ class Produit(models.Model):
         null=True,
         blank=True,
     )
+    largeur = models.IntegerField(  # Added field
+        help_text="Width of the product in mm",
+        null=True,
+        blank=True,
+    )
     surface = models.IntegerField(
         help_text="Surface area of the product in m²",
         null=True,
@@ -382,53 +387,56 @@ class FactureTravaux(models.Model):
     def calculate_totals(self):
         """Calculate invoice totals"""
         if not self.pk:
+            # Instance not saved yet, or no travaux linked.
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
             return 0
 
         total_ht = 0
         for travail in self.travaux.all():
             # Add product costs
-            if travail.produit.prix:
+            if travail.produit and travail.produit.prix is not None:
                 total_ht += float(travail.produit.prix) * travail.quantite
 
             # Add material costs if they exist
             for usage in travail.matiere_usages.all():
-                if usage.matiere.prix_unitaire:
+                if usage.matiere and usage.matiere.prix_unitaire is not None:
                     total_ht += (
                         float(usage.matiere.prix_unitaire) * usage.quantite_utilisee
                     )
 
         self.montant_ht = total_ht
-        self.montant_tva = total_ht * (float(self.tax_rate) / 100)
+        # Ensure tax_rate is a float for calculation
+        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
+        self.montant_tva = total_ht * (tax_rate_float / 100)
         self.montant_ttc = self.montant_ht + self.montant_tva
         return self.montant_ttc
 
     def save(self, *args, **kwargs):
-        if not self.pk:  # New instance
-            # Debug output to understand what's happening
-            print(
-                f"Saving invoice: client_id={getattr(self, 'client_id', None)}, client={getattr(self, 'client', None)}"
-            )
-
-            # More lenient check - if client_id exists, don't require client object
-            if not hasattr(self, "client_id") or (
-                not self.client_id
-                and (not hasattr(self, "client") or self.client is None)
-            ):
-                raise ValueError(
-                    f"Client is required (client_id: {getattr(self, 'client_id', None)}, client: {getattr(self, 'client', None)})"
-                )
-            if not self.date_emission:
-                raise ValueError("Date emission is required")
-            if not self.numero_facture:
-                raise ValueError("Numero facture is required")
-
         is_new = self.pk is None
-        super().save(*args, **kwargs)  # First save to get an ID
+        
+        # If it's a new instance and totals are not pre-calculated,
+        # they will be calculated after the first save if travaux are already linked (e.g. by admin).
+        # However, typically totals are calculated after travaux are set.
+        if is_new and (self.montant_ht is None): # Only set to 0 if not provided
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
 
-        if is_new or not self.montant_ht:  # Calculate totals after initial save
+        super().save(*args, **kwargs)  # Save first (generates PK if new)
+
+        # If totals were not pre-calculated or need recalculation (e.g. after travaux update)
+        # The serializer will call calculate_totals explicitly after setting travaux.
+        # This model save logic ensures totals are calculated if not set.
+        if (is_new and self.travaux.exists()) or (not is_new and self.montant_ht is None): # Recalculate if new and travaux exist, or if totals are None
             self.calculate_totals()
-            if self.montant_ht:  # Only save again if we have amounts to save
-                super().save(*args, **kwargs)
+            # Save again only if totals were calculated and are non-zero or if they changed.
+            # To avoid recursion, use update_fields if possible or a flag.
+            # For simplicity, the serializer will handle the explicit calculation and save.
+            # This part of model's save can be a fallback.
+            if self.montant_ht is not None: # Check if calculate_totals actually set something
+                 super().save(update_fields=['montant_ht', 'montant_tva', 'montant_ttc', 'derniere_mise_a_jour'])
 
 
 class PlanTraite(models.Model):
@@ -574,6 +582,7 @@ class Entreprise(models.Model):
 
 
 class FactureMatiere(models.Model):
+    """Model for material reception BON DE RECEPTION"""
     numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
     client = models.ForeignKey(
         Client,
