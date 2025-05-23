@@ -1,16 +1,15 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage,Entreprise
+from .models import Client, Traveaux, Produit, Matiere, MatiereUsage, Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 
 
 class MatiereSerializer(serializers.ModelSerializer):
- 
     client_id = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(),
-        source='client'
+        queryset=Client.objects.all(), source="client"
     )
-    client_name = serializers.CharField(source='client.nom_client', read_only=True)
+    client_name = serializers.CharField(source="client.nom_client", read_only=True)
+    prix_unitaire = serializers.FloatField(required=False)
 
     class Meta:
         model = Matiere
@@ -36,12 +35,8 @@ class MatiereSerializer(serializers.ModelSerializer):
             "type_matiere": {"required": True},
             "description": {"required": False},
             "prix_unitaire": {"required": False},
-            "client_id": {"required": True}, 
-            "numero_bon": {
-                "required": False,
-                "allow_null": True,
-                "allow_blank": True
-            },
+            "client_id": {"required": True},
+            "numero_bon": {"required": False, "allow_null": True, "allow_blank": True},
             "quantite": {"required": True},
         }
         read_only_fields = (
@@ -49,7 +44,6 @@ class MatiereSerializer(serializers.ModelSerializer):
             "derniere_mise_a_jour",
             "remaining_quantity",
         )
-
 
 
 class ProduitSerializer(serializers.ModelSerializer):
@@ -208,10 +202,8 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
         return super().update(instance, validated_data)
 
+
 class EntrepriseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Entreprise
         fields = "__all__"
-
-
-      

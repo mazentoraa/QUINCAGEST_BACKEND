@@ -12,8 +12,8 @@ class MatiereUsageInvoiceSerializer(serializers.Serializer):
     nom_matiere = serializers.CharField(read_only=True)
     type_matiere = serializers.CharField(read_only=True)
     quantite_utilisee = serializers.FloatField()
-    prix_unitaire = serializers.IntegerField(read_only=True)
-    total = serializers.IntegerField(read_only=True)
+    prix_unitaire = serializers.FloatField(read_only=True)
+    total = serializers.FloatField(read_only=True)
 
 
 class InvoiceItemSerializer(serializers.Serializer):
@@ -31,16 +31,16 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     client_details = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
-    total_ht = serializers.IntegerField(source="montant_ht", read_only=True)
-    total_tax = serializers.IntegerField(source="montant_tva", read_only=True)
-    total_ttc = serializers.IntegerField(source="montant_ttc", read_only=True)
+    total_ht = serializers.FloatField(source="montant_ht", read_only=True)
+    total_tax = serializers.FloatField(source="montant_tva", read_only=True)
+    total_ttc = serializers.FloatField(source="montant_ttc", read_only=True)
     tax_rate = serializers.IntegerField(required=True)
     client = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.all(),
         write_only=True,  # Retained for writing client ID
     )
     # This field is intended to receive the new price for a specific product.
-    prix_unitaire_produit = serializers.IntegerField(
+    prix_unitaire_produit = serializers.FloatField(
         write_only=True, required=False, allow_null=True
     )
     # This field is to identify which product's price to update.

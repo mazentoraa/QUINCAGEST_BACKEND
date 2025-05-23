@@ -139,7 +139,7 @@ class Matiere(models.Model):
         null=True,
         blank=True,
     )
-    prix_unitaire = models.IntegerField(
+    prix_unitaire = models.FloatField(
         help_text="Unit price of the material",
         null=True,
         blank=True,
@@ -194,7 +194,7 @@ class Produit(models.Model):
         default="autre",
         help_text="Material type",
     )
-    prix = models.IntegerField(
+    prix = models.FloatField(
         help_text="Product price",
         null=True,
         blank=True,
@@ -345,13 +345,13 @@ class FactureTravaux(models.Model):
     )
 
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
-    montant_ht = models.IntegerField(
+    montant_ht = models.FloatField(
         null=True,
         blank=True,
         help_text="Total amount excluding tax",
     )
-    montant_tva = models.IntegerField(null=True, blank=True, help_text="Tax amount")
-    montant_ttc = models.IntegerField(
+    montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.FloatField(
         null=True,
         blank=True,
         help_text="Total amount including tax",
@@ -416,10 +416,6 @@ class FactureTravaux(models.Model):
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
-
-        # If it's a new instance and totals are not pre-calculated,
-        # they will be calculated after the first save if travaux are already linked (e.g. by admin).
-        # However, typically totals are calculated after travaux are set.
         if is_new and (self.montant_ht is None):  # Only set to 0 if not provided
             self.montant_ht = 0
             self.montant_tva = 0
@@ -427,17 +423,12 @@ class FactureTravaux(models.Model):
 
         super().save(*args, **kwargs)  # Save first (generates PK if new)
 
-        # If totals were not pre-calculated or need recalculation (e.g. after travaux update)
-        # The serializer will call calculate_totals explicitly after setting travaux.
-        # This model save logic ensures totals are calculated if not set.
+
         if (is_new and self.travaux.exists()) or (
             not is_new and self.montant_ht is None
         ):  # Recalculate if new and travaux exist, or if totals are None
             self.calculate_totals()
-            # Save again only if totals were calculated and are non-zero or if they changed.
-            # To avoid recursion, use update_fields if possible or a flag.
-            # For simplicity, the serializer will handle the explicit calculation and save.
-            # This part of model's save can be a fallback.
+
             if (
                 self.montant_ht is not None
             ):  # Check if calculate_totals actually set something
@@ -479,7 +470,7 @@ class PlanTraite(models.Model):
         null=True, blank=True, help_text="Period between each milking"
     )
 
-    montant_total = models.IntegerField(
+    montant_total = models.FloatField(
         null=True,
         blank=True,
         help_text="Total amount",
@@ -546,7 +537,7 @@ class Traite(models.Model):
         help_text="Traite status",
     )
 
-    montant = models.IntegerField(
+    montant = models.FloatField(
         null=True,
         blank=True,
         help_text="Total amount",
@@ -610,11 +601,11 @@ class FactureMatiere(models.Model):
     notes = models.TextField(blank=True, null=True, help_text="Additional notes")
 
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
-    montant_ht = models.IntegerField(
+    montant_ht = models.FloatField(
         null=True, blank=True, help_text="Total amount excluding tax"
     )
-    montant_tva = models.IntegerField(null=True, blank=True, help_text="Tax amount")
-    montant_ttc = models.IntegerField(
+    montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
+    montant_ttc = models.FloatField(
         null=True, blank=True, help_text="Total amount including tax"
     )
 

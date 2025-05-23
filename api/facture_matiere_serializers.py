@@ -8,7 +8,7 @@ class MatiereReceptionSerializer(serializers.Serializer):
     matiere_id = serializers.IntegerField()
     type_matiere = serializers.CharField(read_only=True)
     quantite = serializers.IntegerField(read_only=True)
-    prix_unitaire = serializers.IntegerField(read_only=True)
+    prix_unitaire = serializers.FloatField(read_only=True)
     surface = serializers.IntegerField(read_only=True)
 
 
@@ -18,9 +18,9 @@ class FactureMatiereSerializer(serializers.ModelSerializer):
     client = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.all(), write_only=True
     )
-    montant_ht = serializers.IntegerField(read_only=True)
-    montant_tva = serializers.IntegerField(read_only=True)
-    montant_ttc = serializers.IntegerField(read_only=True)
+    montant_ht = serializers.FloatField(read_only=True)
+    montant_tva = serializers.FloatField(read_only=True)
+    montant_ttc = serializers.FloatField(read_only=True)
 
     class Meta:
         model = FactureMatiere
