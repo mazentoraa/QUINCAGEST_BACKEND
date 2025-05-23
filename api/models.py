@@ -394,13 +394,14 @@ class FactureTravaux(models.Model):
             return 0
 
         total_ht = 0
-        for travail in self.travaux.all():
+        # Use select_related to ensure we get fresh product data
+        for travail in self.travaux.select_related("produit").all():
             # Add product costs
             if travail.produit and travail.produit.prix is not None:
                 total_ht += float(travail.produit.prix) * travail.quantite
 
             # Add material costs if they exist
-            for usage in travail.matiere_usages.all():
+            for usage in travail.matiere_usages.select_related("matiere").all():
                 if usage.matiere and usage.matiere.prix_unitaire is not None:
                     total_ht += (
                         float(usage.matiere.prix_unitaire) * usage.quantite_utilisee

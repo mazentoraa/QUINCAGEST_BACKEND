@@ -39,6 +39,14 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         queryset=Client.objects.all(),
         write_only=True,  # Retained for writing client ID
     )
+    # This field is intended to receive the new price for a specific product.
+    prix_unitaire_produit = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
+    )
+    # This field is to identify which product's price to update.
+    produit_id = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = FactureTravaux
@@ -48,6 +56,8 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "client",  # Add client field to write data
             "client_details",
             "items",
+            "produit_id",  # Added for write operations to identify product
+            "prix_unitaire_produit",  # Made writable for updating product price
             "date_emission",
             "date_echeance",
             "date_generated",
@@ -73,7 +83,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         """Get work items included in the invoice"""
         items = []
-        for travaux in obj.travaux.all():
+        for travaux in obj.travaux.all().select_related("produit"):
             item = {
                 "id": travaux.id,
                 "produit_name": travaux.produit.nom_produit,
@@ -88,7 +98,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
                 "matiere_usages": [],
             }
 
-            for usage in travaux.matiere_usages.all():
+            for usage in travaux.matiere_usages.all().select_related("matiere"):
                 matiere = usage.matiere
                 prix_unitaire = float(matiere.prix_unitaire or 0.0)
                 item["matiere_usages"].append(
@@ -108,15 +118,47 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        client = validated_data.get("client")
-        if not client:
-            raise serializers.ValidationError({"client": "Client is required."})
+        prix_unitaire_produit_val = validated_data.pop("prix_unitaire_produit", None)
+        produit_id_val = validated_data.pop("produit_id", None)
 
+        # Also check for price updates in line_items context
         line_items = self.context.get("line_items", [])
         if not line_items:
             raise serializers.ValidationError(
                 {"line_items": "At least one line item is required."}
             )
+
+        # Extract product price updates from line_items if not provided in validated_data
+        for item in line_items:
+            item_produit_id = item.get("produit_id")
+            item_prix_unitaire = item.get("prix_unitaire_produit")
+
+            if item_produit_id and item_prix_unitaire:
+                try:
+                    produit_to_update = Produit.objects.get(id=item_produit_id)
+                    produit_to_update.prix = item_prix_unitaire
+                    produit_to_update.save(update_fields=["prix"])
+                except Produit.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {
+                            "produit": f"Produit with ID {item_produit_id} does not exist."
+                        }
+                    )
+
+        # Update product price if both values are provided in validated_data
+        if produit_id_val is not None and prix_unitaire_produit_val is not None:
+            try:
+                produit_to_update = Produit.objects.get(id=produit_id_val)
+                produit_to_update.prix = prix_unitaire_produit_val
+                produit_to_update.save(update_fields=["prix"])
+            except Produit.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"produit": "Produit with this ID does not exist."}
+                )
+
+        client = validated_data.get("client")
+        if not client:
+            raise serializers.ValidationError({"client": "Client is required."})
 
         travaux_ids = []
         for item in line_items:
@@ -129,7 +171,10 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
         unique_travaux_ids = list(set(travaux_ids))
 
-        travaux_list = Traveaux.objects.filter(id__in=unique_travaux_ids, client=client)
+        # Use select_related to get fresh product data including updated prices
+        travaux_list = Traveaux.objects.select_related("produit").filter(
+            id__in=unique_travaux_ids, client=client
+        )
 
         if len(travaux_list) != len(unique_travaux_ids):
             found_ids = {t.id for t in travaux_list}
@@ -171,12 +216,12 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         }
 
         invoice = FactureTravaux(**invoice_create_data)
-        invoice.save()  # Save to get PK
+        invoice.save()
 
-        invoice.travaux.set(travaux_list)  # Set M2M relationship
+        invoice.travaux.set(travaux_list)
 
-        # Now call calculate_totals and save again
-        invoice.calculate_totals()  # This will set montant_ht, montant_tva, montant_ttc on the instance
+        # Now call calculate_totals with fresh data (the model method now uses select_related)
+        invoice.calculate_totals()
         invoice.save(
             update_fields=[
                 "montant_ht",
