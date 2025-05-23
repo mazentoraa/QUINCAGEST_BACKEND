@@ -4,7 +4,6 @@ from .models import Commande, ProduitCommande, Produit, FactureTravaux
 
 class ProduitCommandeSerializer(serializers.ModelSerializer):
     nom_produit = serializers.ReadOnlyField(source="produit.nom_produit")
-
     class Meta:
         model = ProduitCommande
         fields = [
@@ -21,11 +20,12 @@ class ProduitCommandeSerializer(serializers.ModelSerializer):
 
 class CommandeListSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
-
+    devis = serializers.ReadOnlyField(source="devis.numero_devis")
     class Meta:
         model = Commande
         fields = [
             "id",
+            "devis",
             "numero_commande",
             "client",
             "nom_client",
