@@ -157,14 +157,6 @@ class DevisViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 commande = devis.convert_to_commande()
-                cd = devis.convert_to_cd()
-                if cd:
-                    cd.save()
-                else:
-                    return Response(
-                        {"error": "Failed to convert the quote to a cd"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
                 if commande:
                     from .commande_serializers import CommandeDetailSerializer
 
