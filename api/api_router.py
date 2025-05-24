@@ -22,6 +22,8 @@ from .bon_retour_views import (
 )
 from .devis_views import DevisViewSet
 from .commande_views import CommandeViewSet
+from .facture_views import CommandeProduitViewSet,LineCommandeViewSet,FactureViewSet,PaymentComptantViewSet
+
 from . import dashboard_views
 
 
@@ -38,7 +40,10 @@ router.register(r"factures-matieres", FactureMatiereViewSet)
 router.register(r"bons-retour", BonRetourViewSet)
 router.register(r"devis", DevisViewSet)
 router.register(r"commandes", CommandeViewSet)
-
+router.register(r"commandes-produits", CommandeProduitViewSet)
+router.register(r"lignes-commandes", LineCommandeViewSet)
+router.register(r"factures_produits", FactureViewSet)
+router.register(r"payments-comptants", PaymentComptantViewSet)
 
 urlpatterns = [
     path("api/", include(router.urls)),

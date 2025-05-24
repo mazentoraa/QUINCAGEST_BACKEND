@@ -441,115 +441,6 @@ class FactureTravaux(models.Model):
                 )
 
 
-class PlanTraite(models.Model):
-    STATUT_CHOICES = [
-        ("EN_COURS", "En cours"),
-        ("PAYEE", "payée"),
-    ]
-
-    facture = models.OneToOneField(
-        FactureTravaux, on_delete=models.CASCADE, help_text="Invoice"
-    )
-    nombre_traite = models.PositiveIntegerField(help_text="Number of traitements")
-    date_emission = models.DateField(
-        auto_now_add=True, help_text="Invoice generation date"
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
-        default="EN_COURS",
-        help_text="Traite status",
-    )
-
-    date_premier_echeance = models.DateField(
-        null=True, blank=True, help_text="Date of the first installment"
-    )
-
-    periode = models.PositiveIntegerField(
-        null=True, blank=True, help_text="Period between each milking"
-    )
-
-    montant_total = models.FloatField(
-        null=True,
-        blank=True,
-        help_text="Total amount",
-    )
-    nom_raison_sociale = models.CharField(
-        max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
-    )
-    matricule_fiscal = models.CharField(
-        max_length=255, blank=True, null=True, help_text="Matricule fiscal"
-    )
-
-    class Meta:
-        ordering = ["-date_emission", "date_premier_echeance"]
-        indexes = [
-            models.Index(fields=["facture"]),
-            models.Index(fields=["date_emission"]),
-            models.Index(fields=["date_premier_echeance"]),
-            models.Index(fields=["status"]),
-        ]
-
-    def save(self, *args, **kwargs):
-        if not self.montant_total and self.facture_id:
-            self.montant_total = self.facture.montant_ttc
-
-        if not hasattr(self, "_traites_created") and self.pk:
-            self._create_traites()
-
-        super().save(*args, **kwargs)
-
-    def _create_traites(self):
-        if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
-            montant_par_traite = self.montant_total / self.nombre_traite
-
-            for i in range(self.nombre_traite):
-                if i == 0:
-                    date_echeance = self.date_premier_echeance
-                else:
-                    date_echeance = self.date_premier_echeance + timedelta(
-                        days=i * (self.periode or 30)
-                    )
-                Traite.objects.create(
-                    plan_traite=self,
-                    date_echeance=self.date_echeance,
-                    montant=montant_par_traite,
-                    status="NON_PAYEE",
-                )
-
-            self._traites_created = True
-
-
-class Traite(models.Model):
-    STATUT_CHOICES = [("NON_PAYEE", "Non payée"), ("PAYEE", "Payée")]
-
-    plan_traite = models.ForeignKey(
-        PlanTraite, on_delete=models.CASCADE, related_name="traites", help_text="Traite"
-    )
-    date_echeance = models.DateField(
-        auto_now_add=True, help_text="Invoice generation date"
-    )
-    status = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
-        default="NON_PAYEE",
-        help_text="Traite status",
-    )
-
-    montant = models.FloatField(
-        null=True,
-        blank=True,
-        help_text="Total amount",
-    )
-
-    class Meta:
-        ordering = ["-date_echeance"]
-        indexes = [
-            models.Index(fields=["plan_traite"]),
-            models.Index(fields=["date_echeance"]),
-            models.Index(fields=["status"]),
-        ]
-
 
 class Entreprise(models.Model):
     nom_entreprise = models.CharField(max_length=255, help_text="Nom de l'entreprise")
@@ -1157,3 +1048,281 @@ class Commande(models.Model):
         self.save(update_fields=["facture", "statut", "derniere_mise_a_jour"])
 
         return facture
+
+
+# pour les produits
+class CommandeProduit(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="commandes_produits", help_text="Client", null=True, blank=True
+    )
+   
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the command was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the command was last updated"
+    )
+    montant_ht = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        default=0,
+        help_text="Montant hors taxes"
+    )
+    
+    taux_tva = models.DecimalField(
+        max_digits=4,
+        decimal_places=2,
+        default=19,  # 20% par défaut
+        help_text="Taux de TVA en pourcentage"
+    )
+    
+    montant_tva = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Montant de la TVA"
+    )
+    
+    montant_ttc = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Montant toutes taxes comprises"
+    )
+    def save(self, *args, **kwargs):
+        if not self.montant_ht:
+            self.montant_ht = 0
+            
+        self.montant_tva = (self.montant_ht * self.taux_tva) / 100
+        self.montant_ttc = self.montant_ht + self.montant_tva
+        
+        super().save(*args, **kwargs)
+
+
+   
+
+
+    
+
+    class Meta:
+        ordering = ["-date_creation"]
+        indexes = [
+            models.Index(fields=["client"]),
+            models.Index(fields=["date_creation"]),
+        ]
+    
+    
+    def __str__(self):
+        return f"Commande pour {self.client.nom_client}"
+
+
+class Facture(models.Model):
+    commande = models.OneToOneField(
+        CommandeProduit, on_delete=models.CASCADE, related_name="facture", help_text="Commande"
+    )
+
+    montant_total = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Total amount",
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the invoice was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the invoice was last updated"
+    )
+    
+
+
+
+
+class PlanTraite(models.Model):
+    STATUT_CHOICES = [
+        ("EN_COURS", "En cours"),
+        ("PAYEE", "payée"),
+    ]
+
+    facture = models.OneToOneField(
+        Facture, on_delete=models.CASCADE, help_text="Invoice"
+    )
+    nombre_traite = models.PositiveIntegerField(help_text="Number of traitements")
+    date_emission = models.DateField(
+        auto_now_add=True, help_text="Invoice generation date"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="EN_COURS",
+        help_text="Traite status",
+    )
+
+    date_premier_echeance = models.DateField(
+        null=True, blank=True, help_text="Date of the first installment"
+    )
+
+    periode = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Period between each milking"
+    )
+
+    montant_total = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount",
+    )
+    nom_raison_sociale = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
+    )
+    matricule_fiscal = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Matricule fiscal"
+    )
+
+    class Meta:
+        ordering = ["-date_emission", "date_premier_echeance"]
+        indexes = [
+            models.Index(fields=["facture"]),
+            models.Index(fields=["date_emission"]),
+            models.Index(fields=["date_premier_echeance"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.montant_total and self.facture_id:
+            self.montant_total = self.facture.montant_ttc
+
+        if not hasattr(self, "_traites_created") and self.pk:
+            self._create_traites()
+
+        super().save(*args, **kwargs)
+
+    def _create_traites(self):
+        if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
+            montant_par_traite = self.montant_total / self.nombre_traite
+
+            for i in range(self.nombre_traite):
+                if i == 0:
+                    date_echeance = self.date_premier_echeance
+                else:
+                    date_echeance = self.date_premier_echeance + timedelta(
+                        days=i * (self.periode or 30)
+                    )
+                Traite.objects.create(
+                    plan_traite=self,
+                    date_echeance=self.date_echeance,
+                    montant=montant_par_traite,
+                    status="NON_PAYEE",
+                )
+
+            self._traites_created = True
+
+
+class Traite(models.Model):
+    STATUT_CHOICES = [("NON_PAYEE", "Non payée"), ("PAYEE", "Payée")]
+
+    plan_traite = models.ForeignKey(
+        PlanTraite, on_delete=models.CASCADE, related_name="traites", help_text="Traite"
+    )
+    date_echeance = models.DateField(
+        auto_now_add=True, help_text="Invoice generation date"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default="NON_PAYEE",
+        help_text="Traite status",
+    )
+
+    montant = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Total amount",
+    )
+
+    class Meta:
+        ordering = ["-date_echeance"]
+        indexes = [
+            models.Index(fields=["plan_traite"]),
+            models.Index(fields=["date_echeance"]),
+            models.Index(fields=["status"]),
+        ]
+
+class LineCommande(models.Model):
+    commande = models.ForeignKey(
+        CommandeProduit, on_delete=models.CASCADE, related_name="lignes", help_text="Commande"
+    )
+    produit = models.OneToOneField(
+        Produit, on_delete=models.CASCADE, related_name="ligne", help_text="Produit"
+    )
+    prix = models.IntegerField(
+        help_text="Product price",
+        null=True,
+        blank=True,
+    )
+    quantite = models.PositiveIntegerField(
+        default=1, help_text="Quantité"
+    )  # starting quantity
+    prix_total = models.IntegerField(
+        help_text="Total price",
+        null=True,
+        blank=True,
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the command was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the command was last updated"
+    )
+
+    class Meta:
+        ordering = ["-date_creation"]
+        indexes = [
+            models.Index(fields=["commande"]),
+            models.Index(fields=["produit"]),
+            models.Index(fields=["prix"]),
+            models.Index(fields=["quantite"]),
+            models.Index(fields=["prix_total"]),
+            models.Index(fields=["date_creation"]),
+        ]
+
+    def __str__(self):
+        return f"Commande pour {self.client.nom_client} - {self.produit.nom_produit}"
+
+    def save(self, *args, **kwargs):
+        self.prix_total = self.prix * self.quantite 
+        super().save(*args, **kwargs)
+
+
+class PaymentComptant(models.Model):
+    FACTURE_CHOICES = [
+        ("NOT_PAID", "Non payée"),
+        ("PAID", "Payée"),
+        
+    ]
+    facture = models.OneToOneField(
+        Facture, on_delete=models.CASCADE, help_text="Invoice"
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=FACTURE_CHOICES,
+        default="NOT_PAID",
+        help_text="Payment status",
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the payment was created"
+    )
+    montant = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Total amount",
+    )
+
+    class Meta:
+        ordering = ["-date_creation"]
+        indexes = [
+            models.Index(fields=["facture"]),
+            models.Index(fields=["date_creation"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def __str__(self):
+        return f"Paiement pour {self.facture.client.nom_client}"
