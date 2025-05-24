@@ -13,7 +13,7 @@ def validate_email(value):
 
 def validate_phone(value):
     from django.core.exceptions import ValidationError
-
+ 
     if not value.isdigit():
         raise ValidationError("Le numéro doit contenir uniquement des chiffres")
 
