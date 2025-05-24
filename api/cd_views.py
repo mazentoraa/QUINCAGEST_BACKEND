@@ -4,44 +4,44 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Devis, ProduitDevis, Client
-from .devis_serializers import (
-    DevisListSerializer,
-    DevisDetailSerializer,
-    ProduitDevisSerializer,
-    DevisProduitSerializer,
-    DevisConvertToCommandeSerializer,
+from .models import Cd, PdC, Client
+from .pdc_serializers import (
+    CdListSerializer,
+    CDetailSerializer,
+    PdCSerializer,
+    CdPSerializer,
+    CdGenerateInvoiceSerializer,
 )
 
 
-class DevisViewSet(viewsets.ModelViewSet):
+class CdViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for managing quotes (devis)
+    API endpoint for managing orders (commande)
     """
 
-    queryset = Devis.objects.all().order_by("-date_emission", "-numero_devis")
+    queryset = Cd.objects.all().order_by("-date_commande", "-numero_commande")
 
     def get_serializer_class(self):
         if self.action == "list":
-            return DevisListSerializer
-        return DevisDetailSerializer
+            return CdListSerializer
+        return CDetailSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
-            devis = serializer.save()
+            commande = serializer.save()
 
             # Handle adding products if provided in the request
             if "produits" in request.data and isinstance(
                 request.data["produits"], list
             ):
                 for produit_data in request.data["produits"]:
-                    produit_serializer = DevisProduitSerializer(data=produit_data)
+                    produit_serializer = CdPSerializer(data=produit_data)
                     if produit_serializer.is_valid():
-                        ProduitDevis.objects.create(
-                            devis=devis,
+                        PdC.objects.create(
+                            cd=commande,
                             produit=produit_serializer.validated_data["produit"],
                             quantite=produit_serializer.validated_data["quantite"],
                             prix_unitaire=produit_serializer.validated_data.get(
@@ -56,22 +56,22 @@ class DevisViewSet(viewsets.ModelViewSet):
                         print(f"Invalid product data: {produit_serializer.errors}")
 
             # Calculate totals after adding products
-            devis.calculate_totals()
-            devis.save()
+            commande.calculate_totals()
+            commande.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def add_product(self, request, pk=None):
-        devis = self.get_object()
-        serializer = DevisProduitSerializer(data=request.data)
+        commande = self.get_object()
+        serializer = CdPSerializer(data=request.data)
 
         if serializer.is_valid():
             with transaction.atomic():
-                # Check if product already exists in devis
+                # Check if product already exists in commande
                 produit = serializer.validated_data["produit"]
-                produit_devis, created = ProduitDevis.objects.get_or_create(
-                    devis=devis,
+                produit_commande, created = PdC.objects.get_or_create(
+                    cd=commande,
                     produit=produit,
                     defaults={
                         "quantite": serializer.validated_data["quantite"],
@@ -84,28 +84,28 @@ class DevisViewSet(viewsets.ModelViewSet):
 
                 if not created:
                     # Update existing product
-                    produit_devis.quantite = serializer.validated_data["quantite"]
+                    produit_commande.quantite = serializer.validated_data["quantite"]
                     if "prix_unitaire" in serializer.validated_data:
-                        produit_devis.prix_unitaire = serializer.validated_data[
+                        produit_commande.prix_unitaire = serializer.validated_data[
                             "prix_unitaire"
                         ]
                     if "remise_pourcentage" in serializer.validated_data:
-                        produit_devis.remise_pourcentage = serializer.validated_data[
+                        produit_commande.remise_pourcentage = serializer.validated_data[
                             "remise_pourcentage"
                         ]
-                    produit_devis.save()
+                    produit_commande.save()
 
-                # Recalculate devis totals
-                devis.calculate_totals()
-                devis.save()
+                # Recalculate commande totals
+                commande.calculate_totals()
+                commande.save()
 
-                return Response(ProduitDevisSerializer(produit_devis).data)
+                return Response(PdCSerializer(produit_commande).data)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["delete"])
     def remove_product(self, request, pk=None):
-        devis = self.get_object()
+        commande = self.get_object()
         produit_id = request.data.get("produit")
 
         if not produit_id:
@@ -115,70 +115,104 @@ class DevisViewSet(viewsets.ModelViewSet):
 
         try:
             with transaction.atomic():
-                produit_devis = ProduitDevis.objects.get(
-                    devis=devis, produit_id=produit_id
+                produit_commande = PdC.objects.get(
+                    cd=commande, produit_id=produit_id
                 )
-                produit_devis.delete()
+                produit_commande.delete()
 
-                # Recalculate devis totals
-                devis.calculate_totals()
-                devis.save()
+                # Recalculate commande totals
+                commande.calculate_totals()
+                commande.save()
 
                 return Response(status=status.HTTP_204_NO_CONTENT)
-        except ProduitDevis.DoesNotExist:
+        except PdC.DoesNotExist:
             return Response(
-                {"error": "Product not found in the quote"},
+                {"error": "Product not found in the order"},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
     @action(detail=True, methods=["post"])
-    def convert_to_commande(self, request, pk=None):
-        devis = self.get_object()
+    def generate_invoice(self, request, pk=None):
+        commande = self.get_object()
 
-        # Check if devis is in "accepted" state
-        if devis.statut != "accepted":
+        # Check if commande is in "completed" state
+        if commande.statut != "completed":
             return Response(
-                {"error": "Only accepted quotes can be converted to orders"},
+                {"error": "Only completed orders can generate invoices"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if invoice already exists
+        if commande.facture is not None:
+            return Response(
+                {"error": "This order already has an invoice"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         # Validate request data
-        serializer = DevisConvertToCommandeSerializer(data=request.data)
+        serializer = CdGenerateInvoiceSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         # Check confirmation
         if not serializer.validated_data.get("confirmation"):
             return Response(
-                {"error": "Confirmation is required to convert the quote to an order"},
+                {"error": "Confirmation is required to generate an invoice"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             with transaction.atomic():
-                commande = devis.convert_to_commande()
-                cd = devis.convert_to_cd()
-                if cd:
-                    cd.save()
-                else:
-                    return Response(
-                        {"error": "Failed to convert the quote to a cd"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if commande:
-                    from .commande_serializers import CommandeDetailSerializer
+                facture = commande.generate_invoice()
+
+                if facture:
+                    from .invoice_serializers import FactureTravauxSerializer
 
                     return Response(
-                        CommandeDetailSerializer(commande).data,
+                        {
+                            "success": "Invoice generated successfully",
+                            "invoice_id": facture.id,
+                        },
                         status=status.HTTP_201_CREATED,
                     )
                 else:
                     return Response(
-                        {"error": "Failed to convert the quote to an order"},
+                        {"error": "Failed to generate invoice"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"])
+    def update_status(self, request, pk=None):
+        commande = self.get_object()
+        new_status = request.data.get("status")
+
+        if not new_status:
+            return Response(
+                {"error": "New status is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        valid_statuses = [status_choice[0] for status_choice in Cd.STATUT_CHOICES]
+        if new_status not in valid_statuses:
+            return Response(
+                {
+                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Special validation for "completed" status
+        if new_status == "completed" and not commande.produit_commande.exists():
+            return Response(
+                {"error": "Cannot mark as completed: order has no products"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        commande.statut = new_status
+        commande.save()
+
+        return Response(CDetailSerializer(commande).data)
 
     @action(detail=False, methods=["get"])
     def by_client(self, request):
@@ -192,8 +226,8 @@ class DevisViewSet(viewsets.ModelViewSet):
 
         try:
             client = Client.objects.get(pk=client_id)
-            devis = Devis.objects.filter(client=client).order_by("-date_emission")
-            serializer = DevisListSerializer(devis, many=True)
+            commandes = Cd.objects.filter(client=client).order_by("-date_commande")
+            serializer = CdListSerializer(commandes, many=True)
             return Response(serializer.data)
         except Client.DoesNotExist:
             return Response(
