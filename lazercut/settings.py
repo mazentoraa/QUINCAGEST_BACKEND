@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-o=)yd(t+$o)+g3$%k-#2dg7h&1m=f@*sc)untun2tn0mk*3d43
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*", "akrambenghanem.pythonanywhere.com"]
 
 
 # Application definition
@@ -68,10 +68,46 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+CORS_ALLOW_ALL_ORIGINS = True  # For quick testing only, change to specific origins for production
+
+# Or use specific origins (safer for production):
+# CORS_ALLOWED_ORIGINS = [
+#     "https://metal-gest.vercel.app",
+#     "http://localhost:3000",
+# ]
+
+# Allow credentials if you're using cookies/auth
+CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
+    "https://metal-gest.vercel.app"
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+]
+# Allow credentials if you're using cookies or authentication tokens
+CORS_ALLOW_CREDENTIALS = True
+
+# Optionally, specify which HTTP methods are allowed
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Optionally, specify which headers clients are allowed to send
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
 ]
 
 REST_FRAMEWORK = {
