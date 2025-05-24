@@ -22,6 +22,7 @@ from .bon_retour_views import (
 )
 from .devis_views import DevisViewSet
 from .commande_views import CommandeViewSet
+from . import dashboard_views
 
 
 router = DefaultRouter()
@@ -62,6 +63,39 @@ urlpatterns = [
     ),
     path(
         "api/bons-retour/stats/", BonRetourStatsView.as_view(), name="bons-retour-stats"
+    ),
+    path(
+        "api/dashboard/counts/", dashboard_views.global_counts, name="dashboard-counts"
+    ),
+    path(
+        "api/dashboard/financial-summary/",
+        dashboard_views.financial_summary,
+        name="dashboard-financial-summary",
+    ),
+    path(
+        "api/dashboard/devis-status/",
+        dashboard_views.devis_status_counts,
+        name="dashboard-devis-status",
+    ),
+    path(
+        "api/dashboard/commande-status/",
+        dashboard_views.commande_status_counts,
+        name="dashboard-commande-status",
+    ),
+    path(
+        "api/dashboard/recent-commandes/",
+        dashboard_views.recent_commandes,
+        name="dashboard-recent-commandes",
+    ),
+    path(
+        "api/dashboard/recent-factures/",
+        dashboard_views.recent_factures,
+        name="dashboard-recent-factures",
+    ),
+    path(
+        "api/dashboard/main-insights/",
+        dashboard_views.main_dashboard_insights,
+        name="dashboard-main-insights",
     ),
 ]
 
