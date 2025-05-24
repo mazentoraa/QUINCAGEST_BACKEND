@@ -11,10 +11,17 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
+import os
+import dj_database_url
 
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+print(f"DEBUG: {DEBUG}")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+DATABASE_URL = os.environ.get('POSTGRES_URL')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -22,8 +29,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-o=)yd(t+$o)+g3$%k-#2dg7h&1m=f@*sc)untun2tn0mk*3d43'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
 ALLOWED_HOSTS = ["*", "akrambenghanem.pythonanywhere.com"]
 
@@ -150,21 +155,35 @@ WSGI_APPLICATION = 'lazercut.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-    #   'default': {
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     'NAME': 'yuccainfo_db',
-    #     'USER': 'yuccainfo_user',
-    #     'PASSWORD': '*******',
-    #     'HOST': 'localhost',
-    #     'PORT': '5432',
-    # }
-}
 
+
+if DEBUG:
+    print("DEBUG is True")
+    # If DEBUG is True, use SQLite database
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+        #   'default': {
+        #     'ENGINE': 'django.db.backends.postgresql',
+        #     'NAME': 'yuccainfo_db',
+        #     'USER': 'yuccainfo_user',
+        #     'PASSWORD': '*******',
+        #     'HOST': 'localhost',
+        #     'PORT': '5432',
+        # }
+    }
+else:
+    # If DEBUG is False, use PostgreSQL database
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    print(f"DATABASE_URL: {DATABASE_URL}")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable not set")
+
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL)
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
