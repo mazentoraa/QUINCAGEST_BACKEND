@@ -1211,6 +1211,17 @@ class PlanTraite(models.Model):
     matricule_fiscal = models.CharField(
         max_length=255, blank=True, null=True, help_text="Matricule fiscal"
     )
+    mode_paiement = models.CharField(
+        max_length=20,
+        choices=[
+            ("traite", "Traite"),
+            ("cash", "Comptant"),
+            ("mixte", "Mixte"),
+            ("virement", "Virement"),
+        ],
+        default="traite",
+        help_text="Payment method for the installment plan",
+    )
 
     class Meta:
         ordering = ["-date_emission", "date_premier_echeance"]

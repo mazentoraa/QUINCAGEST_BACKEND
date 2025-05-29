@@ -24,25 +24,19 @@ class CommandeProduitViewSet(viewsets.ModelViewSet):
         # Ici vous pourriez ajouter la logique pour créer les lignes de commande
         # si vous les recevez dans la requête
 
-    @action(detail=True, methods=['post'])
-    def create_facture(self, request, pk=None):
-        """
-        Crée une facture pour cette commande
-        """
-        commande = self.get_object()
-        
-        if hasattr(commande, 'facture'):
-            return Response(
-                {"error": "Une facture existe déjà pour cette commande"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        serializer = FactureSerializer(data={'commande': commande.id})
-        if serializer.is_valid():
-            facture = serializer.save()
-            return Response(FactureSerializer(facture).data, status=status.HTTP_201_CREATED)
-        
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+@action(detail=True, methods=['post'])
+def create_facture(self, request, pk=None):
+    commande = self.get_object()
+    if hasattr(commande, 'facture'):
+        return Response(
+            {"error": "Une facture existe déjà pour cette commande"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    serializer = FactureSerializer(data={'commande': commande.id})
+    if serializer.is_valid():
+        facture = serializer.save()
+        return Response(FactureSerializer(facture).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class LineCommandeViewSet(viewsets.ModelViewSet):
     queryset = LineCommande.objects.all().select_related('commande', 'produit')
@@ -66,6 +60,15 @@ class FactureViewSet(viewsets.ModelViewSet):
             payment.status = 'PAID'
             payment.save()
         return Response(PaymentComptantSerializer(payment).data)
+
+    @action(detail=False, methods=['get'])
+    def by_client(self, request):
+        client_id = request.query_params.get("client_id")
+        if not client_id:
+            return Response({"error": "Le paramètre client_id est requis"}, status=400)
+        factures = self.queryset.filter(commande__client_id=client_id)
+        serializer = self.get_serializer(factures, many=True)
+        return Response(serializer.data)
 
 class PaymentComptantViewSet(viewsets.ModelViewSet):
     queryset = PaymentComptant.objects.all().select_related('facture')

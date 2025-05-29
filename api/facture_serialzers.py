@@ -61,18 +61,20 @@ class CommandeSerializer(serializers.ModelSerializer):
 
 class FactureSerializer(serializers.ModelSerializer):
     commande_details = CommandeSerializer(source='commande', read_only=True)
-    client_nom = serializers.CharField(source='command.client.nom_client', read_only=True)
+    client_nom = serializers.CharField(source='commande.client.nom_client', read_only=True)
     commande = serializers.PrimaryKeyRelatedField(
         queryset=CommandeProduit.objects.all(),
         write_only=True,  # Ce champ est seulement pour l'écriture
         required=True
     )
     montant_total = serializers.DecimalField(
-        max_digits=10, 
+        max_digits=10,
         decimal_places=2,
+        required=False,      # <<== important !
+        read_only=True,      # <<== double sécurité pour empêcher l'utilisateur de l'envoyer
         coerce_to_string=False,
     )
-    read_only_fields = ['date_creation', 'derniere_mise_a_jour', 'commande_details', 'client_nom']
+
     class Meta:
         model = Facture
         fields = [
@@ -80,19 +82,13 @@ class FactureSerializer(serializers.ModelSerializer):
             'montant_total', 'date_creation', 'derniere_mise_a_jour'
         ]
         read_only_fields = ['montant_total', 'date_creation', 'derniere_mise_a_jour']
-        extra_kwargs = {
-            'commande': {'write_only': True}  # Le champ commande est en write-only
-        }
+
     def create(self, validated_data):
-        # Récupère la commande associée
         commande = validated_data['commande']
-        
-        # Crée la facture avec le montant TTC de la commande
         facture = Facture.objects.create(
             commande=commande,
             montant_total=commande.montant_ttc
         )
-        
         return facture
 
 class PaymentComptantSerializer(serializers.ModelSerializer):

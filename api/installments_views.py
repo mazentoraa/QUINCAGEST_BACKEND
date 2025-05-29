@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import PlanTraite, Traite
+from .models import PlanTraite, Traite, FactureTravaux, Facture
 from .installments_serializers import (
     PlanTraiteSerializer, 
     TraiteSerializer,
@@ -23,16 +23,16 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
         serializer = CreatePlanTraiteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
+        # Utiliser le bon modèle pour la relation OneToOneField
         facture = FactureTravaux.objects.get(pk=serializer.validated_data['facture_id'])
-        
         plan = PlanTraite.objects.create(
             facture=facture,
             nombre_traite=serializer.validated_data['nombre_traite'],
             date_premier_echeance=serializer.validated_data['date_premier_echeance'],
             periode=serializer.validated_data.get('periode', 30),
-            montant_total=facture.montant_ttc,
-            nom_raison_sociale=facture.client.nom_raison_sociale,
-            matricule_fiscal=facture.client.matricule_fiscal
+            montant_total=getattr(facture, 'montant_ttc', None),
+            nom_raison_sociale=getattr(facture.client, 'nom_raison_sociale', ''),
+            matricule_fiscal=getattr(facture.client, 'matricule_fiscal', ''),
         )
         
         return Response(
