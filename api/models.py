@@ -13,7 +13,7 @@ def validate_email(value):
 
 def validate_phone(value):
     from django.core.exceptions import ValidationError
- 
+
     if not value.isdigit():
         raise ValidationError("Le numéro doit contenir uniquement des chiffres")
 
@@ -441,7 +441,6 @@ class FactureTravaux(models.Model):
                 )
 
 
-
 class Entreprise(models.Model):
     nom_entreprise = models.CharField(max_length=255, help_text="Nom de l'entreprise")
     numero_fiscal = models.CharField(
@@ -818,7 +817,7 @@ class Devis(models.Model):
         # Copy products from devis to commande
         for produit_devis in self.produit_devis.all():
             PdC.objects.create(
-                commande=commande,
+                cd=commande,  # Fixed: was 'commande', should be 'cd'
                 produit=produit_devis.produit,
                 quantite=produit_devis.quantite,
                 prix_unitaire=produit_devis.prix_unitaire,
@@ -1088,9 +1087,14 @@ class Commande(models.Model):
 # pour les produits
 class CommandeProduit(models.Model):
     client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, related_name="commandes_produits", help_text="Client", null=True, blank=True
+        Client,
+        on_delete=models.CASCADE,
+        related_name="commandes_produits",
+        help_text="Client",
+        null=True,
+        blank=True,
     )
-   
+
     date_creation = models.DateTimeField(
         auto_now_add=True, help_text="Date when the command was created"
     )
@@ -1098,46 +1102,35 @@ class CommandeProduit(models.Model):
         auto_now=True, help_text="Date when the command was last updated"
     )
     montant_ht = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        default=0,
-        help_text="Montant hors taxes"
+        max_digits=10, decimal_places=2, default=0, help_text="Montant hors taxes"
     )
-    
+
     taux_tva = models.DecimalField(
         max_digits=4,
         decimal_places=2,
         default=19,  # 20% par défaut
-        help_text="Taux de TVA en pourcentage"
+        help_text="Taux de TVA en pourcentage",
     )
-    
+
     montant_tva = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0,
-        help_text="Montant de la TVA"
+        max_digits=10, decimal_places=2, default=0, help_text="Montant de la TVA"
     )
-    
+
     montant_ttc = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0,
-        help_text="Montant toutes taxes comprises"
+        help_text="Montant toutes taxes comprises",
     )
+
     def save(self, *args, **kwargs):
         if not self.montant_ht:
             self.montant_ht = 0
-            
+
         self.montant_tva = (self.montant_ht * self.taux_tva) / 100
         self.montant_ttc = self.montant_ht + self.montant_tva
-        
+
         super().save(*args, **kwargs)
-
-
-   
-
-
-    
 
     class Meta:
         ordering = ["-date_creation"]
@@ -1145,15 +1138,17 @@ class CommandeProduit(models.Model):
             models.Index(fields=["client"]),
             models.Index(fields=["date_creation"]),
         ]
-    
-    
+
     def __str__(self):
         return f"Commande pour {self.client.nom_client}"
 
 
 class Facture(models.Model):
     commande = models.OneToOneField(
-        CommandeProduit, on_delete=models.CASCADE, related_name="facture", help_text="Commande"
+        CommandeProduit,
+        on_delete=models.CASCADE,
+        related_name="facture",
+        help_text="Commande",
     )
 
     montant_total = models.IntegerField(
@@ -1167,9 +1162,6 @@ class Facture(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the invoice was last updated"
     )
-    
-
-
 
 
 class PlanTraite(models.Model):
@@ -1292,9 +1284,13 @@ class Traite(models.Model):
             models.Index(fields=["status"]),
         ]
 
+
 class LineCommande(models.Model):
     commande = models.ForeignKey(
-        CommandeProduit, on_delete=models.CASCADE, related_name="lignes", help_text="Commande"
+        CommandeProduit,
+        on_delete=models.CASCADE,
+        related_name="lignes",
+        help_text="Commande",
     )
     produit = models.OneToOneField(
         Produit, on_delete=models.CASCADE, related_name="ligne", help_text="Produit"
@@ -1334,7 +1330,7 @@ class LineCommande(models.Model):
         return f"Commande pour {self.client.nom_client} - {self.produit.nom_produit}"
 
     def save(self, *args, **kwargs):
-        self.prix_total = self.prix * self.quantite 
+        self.prix_total = self.prix * self.quantite
         super().save(*args, **kwargs)
 
 
@@ -1342,7 +1338,6 @@ class PaymentComptant(models.Model):
     FACTURE_CHOICES = [
         ("NOT_PAID", "Non payée"),
         ("PAID", "Payée"),
-        
     ]
     facture = models.OneToOneField(
         Facture, on_delete=models.CASCADE, help_text="Invoice"
@@ -1372,8 +1367,8 @@ class PaymentComptant(models.Model):
 
     def __str__(self):
         return f"Paiement pour {self.facture.client.nom_client}"
-    
-    
+
+
 ## make a copy of Models Commande here
 
 
@@ -1493,7 +1488,7 @@ class Cd(models.Model):
         # Total without tax
         total_ht = sum(
             item.prix_total
-            for item in self.produit_cd.all()
+            for item in self.produit_commande.all()
             if item.prix_total is not None
         )
 
@@ -1553,7 +1548,6 @@ class Cd(models.Model):
         self.save(update_fields=["facture", "statut", "derniere_mise_a_jour"])
 
         return facture
-    
 
 
 class PdC(models.Model):
@@ -1562,7 +1556,7 @@ class PdC(models.Model):
     cd = models.ForeignKey(
         "Cd",
         on_delete=models.CASCADE,
-        related_name="produit_cd",
+        related_name="produit_commande",
         help_text="Order",
     )
     produit = models.ForeignKey(
@@ -1606,4 +1600,3 @@ class PdC(models.Model):
         # Update the cd totals
         self.cd.calculate_totals()
         self.cd.save()
-

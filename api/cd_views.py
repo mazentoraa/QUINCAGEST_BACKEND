@@ -106,29 +106,90 @@ class CdViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["delete"])
     def remove_product(self, request, pk=None):
         commande = self.get_object()
-        produit_id = request.data.get("produit")
+
+        # Try to get product ID from different sources
+        produit_id = (
+            request.data.get("produit")
+            or request.data.get("produit_id")
+            or request.query_params.get("produit")
+            or request.query_params.get("produit_id")
+        )
 
         if not produit_id:
             return Response(
-                {"error": "Product ID required"}, status=status.HTTP_400_BAD_REQUEST
+                {"error": "Product ID required in request data or query params"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             with transaction.atomic():
-                produit_commande = PdC.objects.get(
-                    cd=commande, produit_id=produit_id
+                # Debug: Check what products exist in this commande
+                existing_products = PdC.objects.filter(cd=commande)
+                existing_product_details = [
+                    {
+                        "pdc_id": p.id,
+                        "produit_id": p.produit_id,
+                        "produit_name": p.produit.nom_produit,
+                        "quantite": p.quantite,
+                    }
+                    for p in existing_products
+                ]
+                print(f"Commande {commande.id} details:")
+                print(f"  - Numero: {commande.numero_commande}")
+                print(f"  - Client: {commande.client.nom_client}")
+                print(f"  - Existing products: {existing_product_details}")
+                print(
+                    f"  - Looking for product ID: {produit_id} (type: {type(produit_id)})"
                 )
+
+                # Convert produit_id to int if it's a string
+                try:
+                    produit_id = int(produit_id)
+                except (ValueError, TypeError):
+                    return Response(
+                        {"error": f"Invalid product ID format: {produit_id}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                produit_commande = PdC.objects.get(cd=commande, produit_id=produit_id)
+                print(
+                    f"Found PdC record: {produit_commande.id} for product {produit_commande.produit.nom_produit}"
+                )
+
                 produit_commande.delete()
+                print(
+                    f"Successfully deleted product {produit_id} from commande {commande.id}"
+                )
 
                 # Recalculate commande totals
                 commande.calculate_totals()
                 commande.save()
 
-                return Response(status=status.HTTP_204_NO_CONTENT)
+                # Return updated commande data
+                return Response(
+                    CDetailSerializer(commande, context={"request": request}).data,
+                    status=status.HTTP_200_OK,
+                )
         except PdC.DoesNotExist:
+            # More detailed error message
+            existing_product_ids = list(
+                PdC.objects.filter(cd=commande).values_list("produit_id", flat=True)
+            )
             return Response(
-                {"error": "Product not found in the order"},
+                {
+                    "error": f"Product with ID {produit_id} not found in the order",
+                    "existing_products": existing_product_ids,
+                    "commande_id": commande.id,
+                    "commande_numero": commande.numero_commande,
+                    "debug_info": existing_product_details,
+                },
                 status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            print(f"Unexpected error in remove_product: {str(e)}")
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=True, methods=["post"])

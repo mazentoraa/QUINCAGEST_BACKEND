@@ -4,6 +4,7 @@ from .models import Cd, PdC, Produit, FactureTravaux
 
 class PdCSerializer(serializers.ModelSerializer):
     nom_produit = serializers.ReadOnlyField(source="produit.nom_produit")
+
     class Meta:
         model = PdC
         fields = [
@@ -22,6 +23,7 @@ class PdCSerializer(serializers.ModelSerializer):
 class CdListSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     devis = serializers.ReadOnlyField(source="devis.numero_devis")
+
     class Meta:
         model = Cd
         fields = [
@@ -48,7 +50,6 @@ class CDetailSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     devis_numero = serializers.ReadOnlyField(source="devis.numero_devis")
     facture_numero = serializers.ReadOnlyField(source="facture.numero_facture")
-    produits_details = serializers.SerializerMethodField()
 
     class Meta:
         model = Cd
@@ -61,7 +62,6 @@ class CDetailSerializer(serializers.ModelSerializer):
             "devis_numero",
             "produits",
             "produit_commande",
-            "produits_details",
             "date_commande",
             "date_livraison_prevue",
             "date_livraison_reelle",
@@ -89,30 +89,11 @@ class CDetailSerializer(serializers.ModelSerializer):
             "facture",
         ]
 
-    def get_produits_details(self, obj):
-        """Get details about products without creating a through record"""
-        produits = Produit.objects.all()
-        return [
-            {
-                "id": p.id,
-                "nom_produit": p.nom_produit,
-                "prix": p.prix,
-                "type_matiere": p.type_matiere,
-            }
-            for p in produits
-        ]
-
-    def to_representation(self, instance):
-        """Override to customize the representation of the commande"""
-        ret = super().to_representation(instance)
-        # Remove produits_details from output unless it's a GET request
-        request = self.context.get("request")
-        if request and request.method != "GET":
-            ret.pop("produits_details", None)
-        return ret
-
 
 class CdPSerializer(serializers.Serializer):
+    """Serializer to add products to a commande"""
+
+    produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
     """Serializer to add products to a commande"""
 
     produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
