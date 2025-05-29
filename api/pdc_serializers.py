@@ -14,6 +14,7 @@ class PdCSerializer(serializers.ModelSerializer):
             "prix_unitaire",
             "remise_pourcentage",
             "prix_total",
+            "timbre_fiscal",
         ]
         read_only_fields = ["prix_total"]
 
@@ -33,6 +34,7 @@ class CdListSerializer(serializers.ModelSerializer):
             "date_livraison_prevue",
             "date_livraison_reelle",
             "statut",
+            "timbre_fiscal",
             "mode_paiement",
             "montant_ht",
             "montant_tva",
@@ -68,6 +70,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "tax_rate",
             "montant_ht",
             "montant_tva",
+            "timbre_fiscal",
             "montant_ttc",
             "facture",
             "facture_numero",

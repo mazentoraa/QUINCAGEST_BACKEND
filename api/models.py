@@ -1429,6 +1429,7 @@ class Cd(models.Model):
         blank=True,
         help_text="Total amount excluding tax",
     )
+    timbre_fiscal = models.FloatField(null=True, blank=True, help_text="Fiscal stamp")
     montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
     montant_ttc = models.FloatField(
         null=True,
