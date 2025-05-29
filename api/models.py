@@ -1577,6 +1577,9 @@ class PdC(models.Model):
         null=True,
         blank=True,
     )
+    timbre_fiscal = models.FloatField(
+        null=True, blank=True, help_text="Fiscal stamp for this product entry"
+    )
     remise_pourcentage = models.FloatField(default=0, help_text="Discount percentage")
     prix_total = models.FloatField(
         null=True, blank=True, help_text="Total price for this product entry"
