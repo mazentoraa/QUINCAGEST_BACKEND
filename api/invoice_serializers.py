@@ -12,8 +12,8 @@ class MatiereUsageInvoiceSerializer(serializers.Serializer):
     nom_matiere = serializers.CharField(read_only=True)
     type_matiere = serializers.CharField(read_only=True)
     quantite_utilisee = serializers.FloatField()
-    prix_unitaire = serializers.IntegerField(read_only=True)
-    total = serializers.IntegerField(read_only=True)
+    prix_unitaire = serializers.FloatField(read_only=True)
+    total = serializers.FloatField(read_only=True)
 
 
 class InvoiceItemSerializer(serializers.Serializer):
@@ -31,12 +31,21 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     client_details = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
-    total_ht = serializers.IntegerField(source="montant_ht", read_only=True)
-    total_tax = serializers.IntegerField(source="montant_tva", read_only=True)
-    total_ttc = serializers.IntegerField(source="montant_ttc", read_only=True)
+    total_ht = serializers.FloatField(source="montant_ht", read_only=True)
+    total_tax = serializers.FloatField(source="montant_tva", read_only=True)
+    total_ttc = serializers.FloatField(source="montant_ttc", read_only=True)
     tax_rate = serializers.IntegerField(required=True)
     client = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(), write_only=True
+        queryset=Client.objects.all(),
+        write_only=True,  # Retained for writing client ID
+    )
+    # This field is intended to receive the new price for a specific product.
+    prix_unitaire_produit = serializers.FloatField(
+        write_only=True, required=False, allow_null=True
+    )
+    # This field is to identify which product's price to update.
+    produit_id = serializers.IntegerField(
+        write_only=True, required=False, allow_null=True
     )
 
     class Meta:
@@ -47,6 +56,8 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "client",  # Add client field to write data
             "client_details",
             "items",
+            "produit_id",  # Added for write operations to identify product
+            "prix_unitaire_produit",  # Made writable for updating product price
             "date_emission",
             "date_echeance",
             "date_generated",
@@ -72,7 +83,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     def get_items(self, obj):
         """Get work items included in the invoice"""
         items = []
-        for travaux in obj.travaux.all():
+        for travaux in obj.travaux.all().select_related("produit"):
             item = {
                 "id": travaux.id,
                 "produit_name": travaux.produit.nom_produit,
@@ -87,7 +98,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
                 "matiere_usages": [],
             }
 
-            for usage in travaux.matiere_usages.all():
+            for usage in travaux.matiere_usages.all().select_related("matiere"):
                 matiere = usage.matiere
                 prix_unitaire = float(matiere.prix_unitaire or 0.0)
                 item["matiere_usages"].append(
@@ -107,74 +118,118 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        print("Creating invoice with data:", validated_data)
-        travaux_ids = self.context.get("travaux_ids", [])
-        print("Travaux IDs:", travaux_ids)
+        prix_unitaire_produit_val = validated_data.pop("prix_unitaire_produit", None)
+        produit_id_val = validated_data.pop("produit_id", None)
 
-        # Get client from validated_data instead of context
-        client = validated_data.pop("client", None)
-        if not client:
-            client_id = self.context.get("client_id")
-            print("Client ID from context:", client_id)
-            if not client_id:
-                raise serializers.ValidationError("Client ID is required")
-
-            try:
-                client = Client.objects.get(pk=client_id)
-            except Client.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Client with ID {client_id} not found"
-                )
-
-        if not travaux_ids:
-            raise serializers.ValidationError("At least one work item is required")
-
-        travaux_list = Traveaux.objects.filter(id__in=travaux_ids, client=client)
-        if len(travaux_list) != len(travaux_ids):
+        # Also check for price updates in line_items context
+        line_items = self.context.get("line_items", [])
+        if not line_items:
             raise serializers.ValidationError(
-                "Some work items not found or do not belong to this client"
+                {"line_items": "At least one line item is required."}
             )
 
-        # Calculate totals first
-        total_ht = 0
-        for travaux in travaux_list:
-            prix = travaux.produit.prix or 0
-            # Convert to float to ensure consistent type for multiplication
-            total_ht += float(travaux.quantite) * float(prix)
+        # Extract product price updates from line_items if not provided in validated_data
+        for item in line_items:
+            item_produit_id = item.get("produit_id")
+            item_prix_unitaire = item.get("prix_unitaire_produit")
 
-        # Get tax rate
-        tax_rate = validated_data["tax_rate"]
+            if item_produit_id and item_prix_unitaire:
+                try:
+                    produit_to_update = Produit.objects.get(id=item_produit_id)
+                    produit_to_update.prix = item_prix_unitaire
+                    produit_to_update.save(update_fields=["prix"])
+                except Produit.DoesNotExist:
+                    raise serializers.ValidationError(
+                        {
+                            "produit": f"Produit with ID {item_produit_id} does not exist."
+                        }
+                    )
 
-        # Calculate tax and total amounts
-        total_tax = float(total_ht) * (float(tax_rate) / 100)
-        total_ttc = total_ht + total_tax
+        # Update product price if both values are provided in validated_data
+        if produit_id_val is not None and prix_unitaire_produit_val is not None:
+            try:
+                produit_to_update = Produit.objects.get(id=produit_id_val)
+                produit_to_update.prix = prix_unitaire_produit_val
+                produit_to_update.save(update_fields=["prix"])
+            except Produit.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"produit": "Produit with this ID does not exist."}
+                )
 
-        # Generate a unique invoice number if not provided
-        if not validated_data.get("numero_facture"):
+        client = validated_data.get("client")
+        if not client:
+            raise serializers.ValidationError({"client": "Client is required."})
+
+        travaux_ids = []
+        for item in line_items:
+            work_id = item.get("work_id")
+            if work_id is None:
+                raise serializers.ValidationError(
+                    {"line_items": "Each line item must have a 'work_id'."}
+                )
+            travaux_ids.append(work_id)
+
+        unique_travaux_ids = list(set(travaux_ids))
+
+        # Use select_related to get fresh product data including updated prices
+        travaux_list = Traveaux.objects.select_related("produit").filter(
+            id__in=unique_travaux_ids, client=client
+        )
+
+        if len(travaux_list) != len(unique_travaux_ids):
+            found_ids = {t.id for t in travaux_list}
+            missing_or_mismatched_ids = [
+                tid for tid in unique_travaux_ids if tid not in found_ids
+            ]
+            raise serializers.ValidationError(
+                {
+                    "line_items": f"Some work items not found, do not belong to this client, or were duplicated. Problematic work_ids: {missing_or_mismatched_ids}"
+                }
+            )
+
+        tax_rate = validated_data.get("tax_rate")
+        if tax_rate is None:
+            raise serializers.ValidationError({"tax_rate": "Tax rate is required."})
+
+        numero_facture = validated_data.get("numero_facture")
+        if not numero_facture:
             today = timezone.now().strftime("%Y%m%d")
             count = FactureTravaux.objects.filter(
                 numero_facture__startswith=f"INV-{today}"
             ).count()
-            validated_data["numero_facture"] = f"INV-{today}-{count + 1:03d}"
+            numero_facture = f"INV-{today}-{count + 1:03d}"
 
-        # Create and save the invoice with all data at once
-        invoice = FactureTravaux(
-            client=client,
-            date_emission=validated_data.get("date_emission", timezone.now().date()),
-            date_echeance=validated_data.get("date_echeance"),
-            statut=validated_data.get("statut", "draft"),
-            numero_facture=validated_data.get("numero_facture"),
-            tax_rate=tax_rate,
-            montant_ht=total_ht,
-            montant_tva=total_tax,
-            montant_ttc=total_ttc,
-        )
+        # Create invoice instance without totals initially
+        invoice_create_data = {
+            "client": client,
+            "date_emission": validated_data.get("date_emission", timezone.now().date()),
+            "date_echeance": validated_data.get("date_echeance"),
+            "statut": validated_data.get("statut", "draft"),
+            "numero_facture": numero_facture,
+            "tax_rate": tax_rate,
+            "notes": validated_data.get("notes"),
+            "conditions_paiement": validated_data.get("conditions_paiement"),
+        }
+        # Remove None values to avoid overriding model defaults if not provided
+        invoice_create_data = {
+            k: v for k, v in invoice_create_data.items() if v is not None
+        }
 
-        # Save first to get an ID before adding many-to-many relationships
+        invoice = FactureTravaux(**invoice_create_data)
         invoice.save()
 
-        # Now that we have a saved instance with an ID, set the many-to-many relationship
         invoice.travaux.set(travaux_list)
+
+        # Now call calculate_totals with fresh data (the model method now uses select_related)
+        invoice.calculate_totals()
+        invoice.save(
+            update_fields=[
+                "montant_ht",
+                "montant_tva",
+                "montant_ttc",
+                "derniere_mise_a_jour",
+            ]
+        )
 
         return invoice
 
