@@ -1167,42 +1167,24 @@ class Facture(models.Model):
 class PlanTraite(models.Model):
     STATUT_CHOICES = [
         ("EN_COURS", "En cours"),
-        ("PAYEE", "payée"),
+        ("PAYEE", "Payée"),
     ]
 
     facture = models.OneToOneField(
-        Facture, on_delete=models.CASCADE, help_text="Invoice"
+        'FactureTravaux', on_delete=models.CASCADE, null=True, blank=True
     )
-    nombre_traite = models.PositiveIntegerField(help_text="Number of traitements")
-    date_emission = models.DateField(
-        auto_now_add=True, help_text="Invoice generation date"
+    client = models.ForeignKey(
+        "Client", on_delete=models.SET_NULL, null=True, blank=True
     )
-    status = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
-        default="EN_COURS",
-        help_text="Traite status",
-    )
-
-    date_premier_echeance = models.DateField(
-        null=True, blank=True, help_text="Date of the first installment"
-    )
-
-    periode = models.PositiveIntegerField(
-        null=True, blank=True, help_text="Period between each milking"
-    )
-
-    montant_total = models.FloatField(
-        null=True,
-        blank=True,
-        help_text="Total amount",
-    )
-    nom_raison_sociale = models.CharField(
-        max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
-    )
-    matricule_fiscal = models.CharField(
-        max_length=255, blank=True, null=True, help_text="Matricule fiscal"
-    )
+    numero_facture = models.CharField(max_length=50, blank=True, null=True)
+    nombre_traite = models.PositiveIntegerField()
+    date_emission = models.DateField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUT_CHOICES, default="EN_COURS")
+    date_premier_echeance = models.DateField(null=True, blank=True)
+    periode = models.PositiveIntegerField(null=True, blank=True)
+    montant_total = models.FloatField(null=True, blank=True)
+    nom_raison_sociale = models.CharField(max_length=255, blank=True, null=True)
+    matricule_fiscal = models.CharField(max_length=255, blank=True, null=True)
     mode_paiement = models.CharField(
         max_length=20,
         choices=[
@@ -1211,8 +1193,7 @@ class PlanTraite(models.Model):
             ("mixte", "Mixte"),
             ("virement", "Virement"),
         ],
-        default="traite",
-        help_text="Payment method for the installment plan",
+        default="traite"
     )
 
     class Meta:
@@ -1225,56 +1206,49 @@ class PlanTraite(models.Model):
         ]
 
     def save(self, *args, **kwargs):
+        # Calcul automatique du montant si lié à une facture
         if not self.montant_total and self.facture_id:
             self.montant_total = self.facture.montant_ttc
 
-        if not hasattr(self, "_traites_created") and self.pk:
-            self._create_traites()
-
+        creating = self.pk is None  # Nouveau plan ?
         super().save(*args, **kwargs)
+
+        if creating:
+            self._create_traites()
 
     def _create_traites(self):
         if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
             montant_par_traite = self.montant_total / self.nombre_traite
-
             for i in range(self.nombre_traite):
-                if i == 0:
-                    date_echeance = self.date_premier_echeance
-                else:
-                    date_echeance = self.date_premier_echeance + timedelta(
-                        days=i * (self.periode or 30)
-                    )
+                date_echeance = (
+                    self.date_premier_echeance if i == 0 else
+                    self.date_premier_echeance + timedelta(days=i * (self.periode or 30))
+                )
                 Traite.objects.create(
                     plan_traite=self,
-                    date_echeance=self.date_echeance,
-                    montant=montant_par_traite,
-                    status="NON_PAYEE",
+                    date_echeance=date_echeance,
+                    montant=round(montant_par_traite, 3),
+                    status="NON_PAYEE"
                 )
 
-            self._traites_created = True
-
-
 class Traite(models.Model):
-    STATUT_CHOICES = [("NON_PAYEE", "Non payée"), ("PAYEE", "Payée")]
+    STATUT_CHOICES = [
+        ("NON_PAYEE", "Non payée"),
+        ("PAYEE", "Payée"),
+    ]
 
     plan_traite = models.ForeignKey(
-        PlanTraite, on_delete=models.CASCADE, related_name="traites", help_text="Traite"
+        PlanTraite,
+        on_delete=models.CASCADE,
+        related_name="traites"
     )
-    date_echeance = models.DateField(
-        auto_now_add=True, help_text="Invoice generation date"
-    )
+    date_echeance = models.DateField(help_text="Date d'échéance")
     status = models.CharField(
         max_length=20,
         choices=STATUT_CHOICES,
-        default="NON_PAYEE",
-        help_text="Traite status",
+        default="NON_PAYEE"
     )
-
-    montant = models.FloatField(
-        null=True,
-        blank=True,
-        help_text="Total amount",
-    )
+    montant = models.FloatField(null=True, blank=True)
 
     class Meta:
         ordering = ["-date_echeance"]
