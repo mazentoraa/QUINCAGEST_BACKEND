@@ -61,6 +61,7 @@ class ProduitSerializer(serializers.ModelSerializer):
             "image",
             "epaisseur",
             "longueur",
+            "largeur",
             "surface",
             "date_creation",
             "derniere_mise_a_jour",
