@@ -42,7 +42,7 @@ class CdListSerializer(serializers.ModelSerializer):
             "montant_tva",
             "montant_ttc",
         ]
-        read_only_fields = ["montant_ht", "montant_tva", "montant_ttc"]
+        read_only_fields = ["montant_ht", "montant_tva", "montant_ttc", "numero_commande"]
 
 
 class CDetailSerializer(serializers.ModelSerializer):
@@ -84,6 +84,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "montant_tva",
             "montant_ttc",
             "produit_commande",
+            "numero_commande",
             "date_creation",
             "derniere_mise_a_jour",
             "facture",

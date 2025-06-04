@@ -929,7 +929,7 @@ class Commande(models.Model):
     ]
 
     numero_commande = models.CharField(
-        max_length=50, unique=True, help_text="Order number"
+        max_length=50, unique=True, help_text="Order number", blank=True
     )
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="commandes", help_text="Client"
@@ -963,13 +963,24 @@ class Commande(models.Model):
         default="pending",
         help_text="Order status",
     )
-
+    mode_paiement = models.CharField(
+        max_length=20,
+        choices=[
+            ("traite", "Traite"),
+            ("cash", "Comptant"),
+            ("mixte", "Mixte"),
+            ("virement", "Virement"),
+        ],
+        default="cash",
+        help_text="Payment method",
+    )
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
         null=True,
         blank=True,
         help_text="Total amount excluding tax",
     )
+    timbre_fiscal = models.FloatField(null=True, blank=True, help_text="Fiscal stamp")
     montant_tva = models.FloatField(null=True, blank=True, help_text="Tax amount")
     montant_ttc = models.FloatField(
         null=True,
@@ -1034,6 +1045,10 @@ class Commande(models.Model):
         return self.montant_ttc
 
     def save(self, *args, **kwargs):
+        # Auto-generate numero_commande if not provided
+        if not self.numero_commande:
+            self.numero_commande = self._generate_numero_commande()
+
         is_new = self.pk is None
         if is_new and (self.montant_ht is None):
             self.montant_ht = 0
@@ -1056,6 +1071,34 @@ class Commande(models.Model):
                         "derniere_mise_a_jour",
                     ]
                 )
+
+    def _generate_numero_commande(self):
+        """Generate next sequential order number, filling gaps if any exist"""
+        from datetime import datetime
+
+        current_year = datetime.now().year
+        prefix = f"FAC-{current_year}-"
+
+        # Get all existing numbers for current year
+        existing_commandes = Commande.objects.filter(
+            numero_commande__startswith=prefix
+        ).values_list('numero_commande', flat=True)
+
+        # Extract the numeric parts
+        existing_numbers = set()
+        for numero in existing_commandes:
+            try:
+                number = int(numero.split("-")[-1])
+                existing_numbers.add(number)
+            except (ValueError, IndexError):
+                continue
+
+        # Find the first missing number
+        next_number = 1
+        while next_number in existing_numbers:
+            next_number += 1
+
+        return f"{prefix}{next_number:05d}"
 
     def generate_invoice(self):
         """Generate an invoice for this order if it's completed"""
@@ -1500,6 +1543,10 @@ class Cd(models.Model):
         return self.montant_ttc
 
     def save(self, *args, **kwargs):
+        # Auto-generate numero_commande if not provided
+        if not self.numero_commande:
+            self.numero_commande = self._generate_numero_commande()
+
         is_new = self.pk is None
         if is_new and (self.montant_ht is None):
             self.montant_ht = 0
@@ -1522,6 +1569,32 @@ class Cd(models.Model):
                         "derniere_mise_a_jour",
                     ]
                 )
+
+    def _generate_numero_commande(self):
+        """Generate next sequential order number for current year (never reuses numbers)"""
+        from datetime import datetime
+
+        current_year = datetime.now().year
+        prefix = f"FAC-{current_year}-"
+
+        # Find the highest existing number for current year
+        existing_commandes = Cd.objects.filter(
+            numero_commande__startswith=prefix
+        ).order_by("-numero_commande")
+
+        if existing_commandes.exists():
+            last_numero = existing_commandes.first().numero_commande
+            # Extract the sequential number part
+            try:
+                last_number = int(last_numero.split("-")[-1])
+                next_number = last_number + 1
+            except (ValueError, IndexError):
+                next_number = 1
+        else:
+            next_number = 1
+
+        # Format with 5-digit zero padding
+        return f"{prefix}{next_number:05d}"
 
     def generate_invoice(self):
         """Generate an invoice for this order if it's completed"""
