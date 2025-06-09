@@ -4,25 +4,36 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('api', '0002_alter_plantraite_client_alter_plantraite_facture_and_more'),
+        ("api", "0002_alter_plantraite_client_alter_plantraite_facture_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='commande',
-            name='mode_paiement',
-            field=models.CharField(choices=[('traite', 'Traite'), ('cash', 'Comptant'), ('mixte', 'Mixte'), ('virement', 'Virement')], default='cash', help_text='Payment method', max_length=20),
+            model_name="commande",
+            name="mode_paiement",
+            field=models.CharField(
+                choices=[
+                    ("traite", "Traite"),
+                    ("cash", "Comptant"),
+                    ("mixte", "Mixte"),
+                    ("virement", "Virement"),
+                ],
+                default="cash",
+                help_text="Payment method",
+                max_length=20,
+            ),
         ),
         migrations.AddField(
-            model_name='commande',
-            name='timbre_fiscal',
-            field=models.FloatField(blank=True, help_text='Fiscal stamp', null=True),
+            model_name="commande",
+            name="timbre_fiscal",
+            field=models.FloatField(blank=True, help_text="Fiscal stamp", null=True),
         ),
         migrations.AlterField(
-            model_name='commande',
-            name='numero_commande',
-            field=models.CharField(blank=True, help_text='Order number', max_length=50, unique=True),
+            model_name="commande",
+            name="numero_commande",
+            field=models.CharField(
+                blank=True, help_text="Order number", max_length=50, unique=True
+            ),
         ),
     ]
