@@ -1,14 +1,18 @@
 from datetime import timedelta
 from django.db import models
 import re
-
+from django.core.exceptions import ValidationError
 
 def validate_email(value):
-    from django.core.exceptions import ValidationError
 
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(email_pattern, value):
         raise ValidationError("Format d'email invalide")
+
+def validate_matricule_fiscal(value):
+    pattern = r'^\d{3}\s\d{4}[A-Z]/[A-Z]/[A-Z]/\d{3}$'
+    if not re.match(pattern, value):
+        raise ValidationError("Le matricule fiscal doit être au format : 000 0000X/X/X/000")
 
 
 def validate_phone(value):
@@ -21,7 +25,7 @@ def validate_phone(value):
 class Client(models.Model):
     nom_client = models.CharField(max_length=255, help_text="Client name")
     numero_fiscal = models.CharField(
-        max_length=255, unique=True, help_text="Fiscal registration number"
+        max_length=255, unique=True,validators=[validate_matricule_fiscal], help_text="Fiscal registration number"
     )
     adresse = models.CharField(
         max_length=255, blank=True, null=True, help_text="Client address"
@@ -74,6 +78,11 @@ class Client(models.Model):
     nom_raison_sociale = models.CharField(
         max_length=255, blank=True, null=True, help_text="Nom de la raison sociale"
     )
+    code_client = models.CharField(max_length=5, unique=True, blank=True)
+    is_deleted = models.BooleanField(default=False, help_text="Client deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the client was deleted"
+    )
 
     class Meta:
         ordering = ["nom_client"]
@@ -84,6 +93,15 @@ class Client(models.Model):
 
     def __str__(self):
         return self.nom_client
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            super().save(*args, **kwargs)
+            self.code_client = f"{self.id:05d}"
+            kwargs['force_insert'] = False
+            super().save(*args, **kwargs)
+        else:
+            super().save(*args, **kwargs)
 
 
 class Matiere(models.Model):
@@ -156,6 +174,10 @@ class Matiere(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the material was last updated"
     )
+    is_deleted = models.BooleanField(default=False, help_text="Material deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the material was deleted"
+    )
 
     def __str__(self):
         return f"{self.type_matiere} - {self.client.nom_client}"
@@ -205,22 +227,22 @@ class Produit(models.Model):
         null=True,
         help_text="Product image",
     )
-    epaisseur = models.IntegerField(
+    epaisseur = models.FloatField(
         help_text="Thickness of the product in mm",
         null=True,
         blank=True,
     )
-    longueur = models.IntegerField(
+    longueur = models.FloatField(
         help_text="Length of the product in mm",
         null=True,
         blank=True,
     )
-    largeur = models.IntegerField(  # Added field
+    largeur = models.FloatField(  # Added field
         help_text="Width of the product in mm",
         null=True,
         blank=True,
     )
-    surface = models.IntegerField(
+    surface = models.FloatField(
         help_text="Surface area of the product in m²",
         null=True,
         blank=True,
@@ -230,6 +252,10 @@ class Produit(models.Model):
     )
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the product was last updated"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Product deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the product was deleted"
     )
 
     class Meta:
@@ -255,6 +281,10 @@ class MatiereUsage(models.Model):
     )
     quantite_utilisee = models.PositiveIntegerField(
         default=1, help_text="Quantity used in the work"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Material usage deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the material usage was deleted"
     )
 
     class Meta:
@@ -304,6 +334,10 @@ class Traveaux(models.Model):
     )
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the work was last updated"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Work deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the work was deleted"
     )
 
     class Meta:
@@ -370,6 +404,10 @@ class FactureTravaux(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Last update date"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Invoice deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the invoice was deleted"
     )
 
     class Meta:
@@ -502,6 +540,10 @@ class FactureMatiere(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Last update date"
     )
+    is_deleted = models.BooleanField(default=False, help_text="BON deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the BON was deleted"
+    )
 
     class Meta:
         ordering = ["-date_reception"]
@@ -577,6 +619,10 @@ class BonRetour(models.Model):
     )
     date_retour = models.DateField(help_text="Return date")
     date_emission = models.DateField(auto_now_add=True, help_text="Emission date")
+    is_deleted = models.BooleanField(default=False, help_text="BON returned deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the BON returned was deleted"
+    )
 
     class Meta:
         ordering = ["-date_retour", "-numero_bon"]
@@ -604,6 +650,10 @@ class MatiereRetour(models.Model):
     )
     quantite_retournee = models.PositiveIntegerField(
         default=1, help_text="Quantity of material returned"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Material returned deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the material returned was deleted"
     )
 
     class Meta:
@@ -640,6 +690,10 @@ class ProduitDevis(models.Model):
     remise_pourcentage = models.FloatField(default=0, help_text="Discount percentage")
     prix_total = models.FloatField(
         null=True, blank=True, help_text="Total price for this product entry"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Product entry deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the product entry was deleted"
     )
 
     class Meta:
@@ -729,6 +783,10 @@ class Devis(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Last update date"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Quote deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the quote was deleted"
     )
 
     class Meta:
@@ -893,6 +951,10 @@ class ProduitCommande(models.Model):
     prix_total = models.FloatField(
         null=True, blank=True, help_text="Total price for this product entry"
     )
+    is_deleted = models.BooleanField(default=False, help_text="Product entry deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the product entry was deleted"
+    )
 
     class Meta:
         unique_together = ("commande", "produit")
@@ -1007,6 +1069,10 @@ class Commande(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True, help_text="Creation date")
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Last update date"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Order deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the order was deleted"
     )
 
     class Meta:
@@ -1165,6 +1231,10 @@ class CommandeProduit(models.Model):
         default=0,
         help_text="Montant toutes taxes comprises",
     )
+    is_deleted = models.BooleanField(default=False, help_text="Tax deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the tax was deleted"
+    )
 
     def save(self, *args, **kwargs):
         if not self.montant_ht:
@@ -1204,6 +1274,10 @@ class Facture(models.Model):
     )
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the invoice was last updated"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Invoice deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the invoice was deleted"
     )
 
 

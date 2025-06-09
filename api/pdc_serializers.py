@@ -23,6 +23,7 @@ class PdCSerializer(serializers.ModelSerializer):
 class CdListSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     devis = serializers.ReadOnlyField(source="devis.numero_devis")
+    code_client = serializers.ReadOnlyField(source="client.code_client")
 
     class Meta:
         model = Cd
@@ -32,6 +33,7 @@ class CdListSerializer(serializers.ModelSerializer):
             "numero_commande",
             "client",
             "nom_client",
+            "code_client",
             "date_commande",
             "date_livraison_prevue",
             "date_livraison_reelle",
@@ -50,6 +52,7 @@ class CDetailSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     devis_numero = serializers.ReadOnlyField(source="devis.numero_devis")
     facture_numero = serializers.ReadOnlyField(source="facture.numero_facture")
+    code_client = serializers.ReadOnlyField(source="client.code_client")
 
     class Meta:
         model = Cd
@@ -58,6 +61,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "numero_commande",
             "client",
             "nom_client",
+            "code_client",
             "devis",
             "devis_numero",
             "produits",

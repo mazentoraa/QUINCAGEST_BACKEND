@@ -74,6 +74,15 @@ class ClientSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("date_creation", "derniere_mise_a_jour")
 
+        def validate_numero_fiscal(self, value):
+            import re
+            pattern = r'^\d{3}\s\d{4}[A-Z]/[A-Z]/[A-Z]/\d{3}$'
+            if not re.match(pattern, value):
+                raise serializers.ValidationError(
+                    "Format invalide. Format attendu : 000 0000X/X/X/000"
+                )
+            return value
+
 
 class MatiereUsageSerializer(serializers.ModelSerializer):
     matiere_id = serializers.IntegerField()

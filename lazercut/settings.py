@@ -165,11 +165,11 @@ if DEBUG:
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
-        #   'default': {
+        #    'default': {
         #     'ENGINE': 'django.db.backends.postgresql',
-        #     'NAME': 'yuccainfo_db_3',
-        #     'USER': 'yuccainfo_user',
-        #     'PASSWORD': 'yuccainfo_pwd',
+        #     'NAME': '****',
+        #     'USER': '***',
+        #     'PASSWORD': '***',
         #     'HOST': 'localhost',
         #     'PORT': '5432',
         # }
