@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("api", "0030_remove_traite_bank_remove_traite_acceptation_and_more"),
+        ("api", "0002_alter_plantraite_client_alter_plantraite_facture_and_more"),
     ]
 
     operations = [
