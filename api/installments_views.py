@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import PlanTraite, Traite, FactureTravaux
+from .models import PlanTraite, Traite, Client, Cd
 from .installments_serializers import (
     PlanTraiteSerializer,
     TraiteSerializer,
@@ -11,7 +11,7 @@ from .installments_serializers import (
 
 
 class PlanTraiteViewSet(viewsets.ModelViewSet):
-    queryset = PlanTraite.objects.all().select_related('facture')
+    queryset = PlanTraite.objects.all().select_related('client')
     serializer_class = PlanTraiteSerializer
 
     def get_serializer_class(self):
@@ -20,37 +20,42 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def create(self, request, *args, **kwargs):
-        # Afficher les données reçues pour le debug
-        print("📥 Données reçues dans le backend :", request.data)
-
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         validated_data = serializer.validated_data
 
-        facture_id = validated_data.get('facture_id')
+        numero_commande = validated_data.get('numero_commande')
         nombre_traite = validated_data.get('nombre_traite')
         date_premier_echeance = validated_data.get('date_premier_echeance')
         periode = validated_data.get('periode', 30)
 
-        # Récupération de la facture
         try:
-            facture = FactureTravaux.objects.get(pk=facture_id)
-        except FactureTravaux.DoesNotExist:
-            return Response({"facture_id": ["Facture introuvable."]}, status=status.HTTP_400_BAD_REQUEST)
+            commande = Cd.objects.select_related('client').get(numero_commande=numero_commande)
+            client = commande.client
+        except Cd.DoesNotExist:
+            return Response(
+                {"numero_commande": ["Commande introuvable."]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # Création du plan de traite
+        montant_total = validated_data.get('montant_total') or commande.montant_ttc
+        nom_raison_sociale = client.nom_client
+        matricule_fiscal = client.numero_fiscal
+
         plan = PlanTraite.objects.create(
-            facture=facture,
+            client=client,
+            numero_facture=numero_commande,
             nombre_traite=nombre_traite,
             date_premier_echeance=date_premier_echeance,
             periode=periode,
-            montant_total=facture.montant_ttc,
-            nom_raison_sociale=facture.client.nom_raison_sociale,
-            matricule_fiscal=facture.client.matricule_fiscal
+            montant_total=montant_total,
+            nom_raison_sociale=nom_raison_sociale,
+            matricule_fiscal=matricule_fiscal,
         )
 
-        # Retour du plan créé
+        plan._create_traites()
+        plan.save()
+
         return Response(PlanTraiteSerializer(plan).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['get'])
@@ -65,20 +70,26 @@ class TraiteViewSet(viewsets.ModelViewSet):
     queryset = Traite.objects.all().select_related('plan_traite')
     serializer_class = TraiteSerializer
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], url_path='update-status')
     def update_status(self, request, pk=None):
         traite = self.get_object()
         serializer = UpdateTraiteStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        # Mise à jour du statut
-        traite.status = serializer.validated_data['status']
+        new_status = serializer.validated_data['status']
+        traite.status = new_status
         traite.save()
 
-        # Vérifie si toutes les traites sont payées
         plan = traite.plan_traite
-        if plan.traites.filter(status='NON_PAYEE').count() == 0:
+        traites = plan.traites.all()
+
+        if all(t.status == 'PAYEE' for t in traites):
             plan.status = 'PAYEE'
-            plan.save()
+        elif any(t.status == 'PAYEE' for t in traites):
+            plan.status = 'PARTIELLEMENT_PAYEE'
+        else:
+            plan.status = 'NON_PAYEE'
+
+        plan.save()
 
         return Response(TraiteSerializer(traite).data)
