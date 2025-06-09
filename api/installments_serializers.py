@@ -42,4 +42,7 @@ class CreatePlanTraiteSerializer(serializers.Serializer):
 
 
 class UpdateTraiteStatusSerializer(serializers.Serializer):
-    status = serializers.ChoiceField(choices=Traite.STATUT_CHOICES)
+    status = serializers.ChoiceField(choices=['PAYEE', 'NON_PAYEE'])
+
+    def validate_status(self, value):
+        return value.upper()

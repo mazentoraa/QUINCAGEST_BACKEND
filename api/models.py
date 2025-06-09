@@ -1244,8 +1244,7 @@ class Traite(models.Model):
     )
     date_echeance = models.DateField(help_text="Date d'échéance")
     status = models.CharField(
-        max_length=20,
-        choices=STATUT_CHOICES,
+        max_length=255,
         default="NON_PAYEE"
     )
     montant = models.FloatField(null=True, blank=True)

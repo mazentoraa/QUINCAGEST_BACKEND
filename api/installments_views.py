@@ -53,7 +53,7 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
             matricule_fiscal=matricule_fiscal,
         )
 
-        plan._create_traites()  # 🔁 Appel direct et sûr
+        plan._create_traites()
         plan.save()
 
         return Response(PlanTraiteSerializer(plan).data, status=status.HTTP_201_CREATED)
@@ -70,24 +70,26 @@ class TraiteViewSet(viewsets.ModelViewSet):
     queryset = Traite.objects.all().select_related('plan_traite')
     serializer_class = TraiteSerializer
 
-    @action(detail=True, methods=['patch'])
+    @action(detail=True, methods=['patch'], url_path='update-status')
     def update_status(self, request, pk=None):
         traite = self.get_object()
         serializer = UpdateTraiteStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        traite.status = serializer.validated_data['status']
+        new_status = serializer.validated_data['status']
+        traite.status = new_status
         traite.save()
 
         plan = traite.plan_traite
-        # ✅ Vérifie si toutes les traites du plan sont payées
-        if not plan.traites.filter(status="NON_PAYEE").exists():
-            plan.status = "PAYEE"
-            plan.save()
+        traites = plan.traites.all()
+
+        if all(t.status == 'PAYEE' for t in traites):
+            plan.status = 'PAYEE'
+        elif any(t.status == 'PAYEE' for t in traites):
+            plan.status = 'PARTIELLEMENT_PAYEE'
+        else:
+            plan.status = 'NON_PAYEE'
+
+        plan.save()
 
         return Response(TraiteSerializer(traite).data)
-
-
-
-
-

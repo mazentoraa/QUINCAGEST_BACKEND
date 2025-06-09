@@ -193,12 +193,12 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
         numero_facture = validated_data.get("numero_facture")
         if not numero_facture:
-            today = timezone.now().strftime("%Y%m%d")
+            year = timezone.now().strftime("%Y")
             count = FactureTravaux.objects.filter(
-                numero_facture__startswith=f"INV-{today}"
+                numero_facture__startswith=f"FAC-{year}"
             ).count()
-            numero_facture = f"INV-{today}-{count + 1:03d}"
-
+            numero_facture = f"FAC-{year}-{count + 1:05d}"
+    
         # Create invoice instance without totals initially
         invoice_create_data = {
             "client": client,
