@@ -1747,3 +1747,44 @@ class PdC(models.Model):
         # Update the cd totals
         self.cd.calculate_totals()
         self.cd.save()
+
+
+class MatierePurchase(models.Model):
+    nom = models.CharField(
+        max_length=100,
+        blank=True,
+
+    )
+    description = models.TextField(
+        blank=True, null=True, help_text="Material description"
+    )
+    prix_unitaire = models.FloatField(
+        help_text="Unit price of the material",
+        null=True,
+        blank=True,
+    )
+    quantite = models.PositiveIntegerField(
+        default=0, help_text="Quantity in stock"
+    )  # starting quantity
+    
+    date_creation = models.DateTimeField(
+        auto_now_add=True, help_text="Date when the material was created"
+    )
+    derniere_mise_a_jour = models.DateTimeField(
+        auto_now=True, help_text="Date when the material was last updated"
+    )
+    is_deleted = models.BooleanField(default=False, help_text="Material deleted")
+    deleted_at = models.DateTimeField(
+        null=True, blank=True, help_text="Date when the material was deleted"
+    )
+
+    def __str__(self):
+        return f"{self.type_matiere} - {self.client.nom_client}"
+
+    # def save(self, *args, **kwargs):
+    #     # If this is a new instance or remaining_quantity wasn't explicitly set
+    #     if not self.pk or self.remaining_quantity == 0:
+    #         self.remaining_quantity = self.quantite
+    #     super().save(*args, **kwargs)
+
+   

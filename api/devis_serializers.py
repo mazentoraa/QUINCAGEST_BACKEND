@@ -21,11 +21,13 @@ class ProduitDevisSerializer(serializers.ModelSerializer):
 
 class DevisListSerializer(serializers.ModelSerializer):
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
+    code_client = serializers.ReadOnlyField(source="client.code_client")
 
     class Meta:
         model = Devis
         fields = [
             "id",
+            "code_client",
             "numero_devis",
             "client",
             "nom_client",

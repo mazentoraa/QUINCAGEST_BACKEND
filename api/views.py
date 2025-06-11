@@ -245,7 +245,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [IsAdminUser]
-    queryset = Produit.objects.all().order_by("date_creation")
+    queryset = Produit.objects.all().order_by("-id")
     serializer_class = ProduitSerializer
 
     @swagger_auto_schema(

@@ -167,9 +167,9 @@ if DEBUG:
         }
         #    'default': {
         #     'ENGINE': 'django.db.backends.postgresql',
-        #     'NAME': '****',
-        #     'USER': '***',
-        #     'PASSWORD': '***',
+        #     'NAME': 'yuccainfo_database',
+        #     'USER': 'yuccainfo_user',
+        #     'PASSWORD': 'yuccainfo_pwd',
         #     'HOST': 'localhost',
         #     'PORT': '5432',
         # }
