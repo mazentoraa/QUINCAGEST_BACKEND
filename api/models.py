@@ -3,6 +3,15 @@ from django.db import models
 import re
 from django.core.exceptions import ValidationError
 
+MATIERE_PREFIXES = {
+    "acier": "AC",
+    "acier_inoxydable": "AI",
+    "aluminium": "AL",
+    "laiton": "LA",
+    "cuivre": "CU",
+    "acier_galvanise": "AG",
+    "autre": "OT",
+}
 def validate_email(value):
 
     email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
@@ -257,6 +266,10 @@ class Produit(models.Model):
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the product was deleted"
     )
+    code_produit = models.CharField(
+    max_length=20,
+    blank=True,
+)
 
     class Meta:
         ordering = ["nom_produit"]
@@ -264,6 +277,26 @@ class Produit(models.Model):
             models.Index(fields=["nom_produit"]),
             models.Index(fields=["prix"]),
         ]
+    
+    def save(self, *args, **kwargs):
+        if not self.code_produit:
+            prefix = MATIERE_PREFIXES.get(self.type_matiere, "OT")
+
+           
+            existing_codes = Produit.objects.filter(code_produit__startswith=prefix + "-") \
+                                            .values_list("code_produit", flat=True)
+
+            max_number = 0
+            for code in existing_codes:
+                try:
+                    number = int(code.split("-")[-1])
+                    max_number = max(max_number, number)
+                except (ValueError, IndexError):
+                    continue
+
+            self.code_produit = f"{prefix}-{max_number + 1:04d}"
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nom_produit
@@ -1746,6 +1779,7 @@ class MatierePurchase(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the material was last updated"
     )
+    purshase_date = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False, help_text="Material deleted")
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the material was deleted"

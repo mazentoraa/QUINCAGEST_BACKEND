@@ -4,13 +4,14 @@ from .models import Cd, PdC, Produit, FactureTravaux
 
 class PdCSerializer(serializers.ModelSerializer):
     nom_produit = serializers.ReadOnlyField(source="produit.nom_produit")
-
+    code_produit = serializers.ReadOnlyField(source="produit.code_produit")
     class Meta:
         model = PdC
         fields = [
             "id",
             "produit",
             "nom_produit",
+            "code_produit",
             "quantite",
             "prix_unitaire",
             "remise_pourcentage",

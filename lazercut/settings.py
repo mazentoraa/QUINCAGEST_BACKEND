@@ -161,18 +161,18 @@ if DEBUG:
     print("DEBUG is True")
     # If DEBUG is True, use SQLite database
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-        #    'default': {
-        #     'ENGINE': 'django.db.backends.postgresql',
-        #     'NAME': 'yuccainfo_database',
-        #     'USER': 'yuccainfo_user',
-        #     'PASSWORD': 'yuccainfo_pwd',
-        #     'HOST': 'localhost',
-        #     'PORT': '5432',
+        # 'default': {
+        #     'ENGINE': 'django.db.backends.sqlite3',
+        #     'NAME': BASE_DIR / 'db.sqlite3',
         # }
+           'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'yuccainfo_db_3',
+            'USER': 'yuccainfo_user',
+            'PASSWORD': 'yuccainfo_pwd',
+            'HOST': 'localhost',
+            'PORT': '5432',
+        }
     }
 else:
     # If DEBUG is False, use PostgreSQL database

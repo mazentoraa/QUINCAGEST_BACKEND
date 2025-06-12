@@ -14,6 +14,7 @@ class MatierePurchaseSerializer(serializers.ModelSerializer):
             'quantite',
             'date_creation',
             'derniere_mise_a_jour',
+            'purshase_date',
             'is_deleted',
             'deleted_at',
         ]

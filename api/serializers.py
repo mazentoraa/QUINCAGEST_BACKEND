@@ -65,6 +65,7 @@ class ProduitSerializer(serializers.ModelSerializer):
             "surface",
             "date_creation",
             "derniere_mise_a_jour",
+            "code_produit",
         ]
 
 
