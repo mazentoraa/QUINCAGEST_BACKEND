@@ -4,6 +4,7 @@ from .models import Devis, ProduitDevis, Produit, Client
 
 class ProduitDevisSerializer(serializers.ModelSerializer):
     nom_produit = serializers.ReadOnlyField(source="produit.nom_produit")
+    code_produit = serializers.ReadOnlyField(source="produit.code_produit")
 
     class Meta:
         model = ProduitDevis
@@ -15,6 +16,7 @@ class ProduitDevisSerializer(serializers.ModelSerializer):
             "prix_unitaire",
             "remise_pourcentage",
             "prix_total",
+            "code_produit",
         ]
         read_only_fields = ["prix_total"]
 
@@ -45,6 +47,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
     produit_devis = ProduitDevisSerializer(many=True, read_only=True)
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     produits_details = serializers.SerializerMethodField()
+    code_client = serializers.ReadOnlyField(source="client.code_client")
 
     class Meta:
         model = Devis
@@ -53,6 +56,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
             "numero_devis",
             "client",
             "nom_client",
+            "code_client",
             "produits",
             "produit_devis",
             "produits_details",
@@ -87,6 +91,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
                 "nom_produit": p.nom_produit,
                 "prix": p.prix,
                 "type_matiere": p.type_matiere,
+                "code_produit": p.code_produit,
             }
             for p in produits
         ]
