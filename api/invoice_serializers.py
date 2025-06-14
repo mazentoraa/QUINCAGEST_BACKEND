@@ -18,12 +18,37 @@ class MatiereUsageInvoiceSerializer(serializers.Serializer):
 
 class InvoiceItemSerializer(serializers.Serializer):
     """Serializer for individual work items in an invoice"""
-
     id = serializers.IntegerField()
-    produit_name = serializers.CharField(read_only=True)
+    
+    # Product details (assumes `produit` is related field on Traveaux)
+    produit_id = serializers.IntegerField(source="produit.id", read_only=True)
+    code_produit = serializers.CharField(source="produit.code_produit", read_only=True)
+    nom_produit = serializers.CharField(source="produit.nom_produit", read_only=True)
+    description_produit = serializers.CharField(source="produit.description", read_only=True)
+    
     description = serializers.CharField(allow_blank=True, required=False)
-    billable = serializers.DictField(child=serializers.FloatField())
+    remise = serializers.FloatField(read_only=True)
+
+    billable = serializers.SerializerMethodField()
     matiere_usages = MatiereUsageInvoiceSerializer(many=True, required=False)
+
+    def get_billable(self, obj):
+        quantite = obj.quantite
+        prix_unitaire = float(obj.produit.prix or 0)
+        remise = float(obj.remise or 0)
+
+        total_ht = quantite * prix_unitaire
+        total_remise = total_ht * remise / 100
+        total_after_remise = total_ht - total_remise
+
+        return {
+            "quantite": quantite,
+            "prix_unitaire": prix_unitaire,
+            "remise_percent": remise,
+            "total_ht_brut": round(total_ht, 2),
+            "total_remise": round(total_remise, 2),
+            "total_ht": round(total_after_remise, 2),
+        }
 
 
 class FactureTravauxSerializer(serializers.ModelSerializer):
@@ -78,43 +103,15 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "adresse": obj.client.adresse,
             "telephone": obj.client.telephone,
             "email": obj.client.email,
+            "code_client":obj.client.code_client,
         }
 
+    
     def get_items(self, obj):
-        """Get work items included in the invoice"""
-        items = []
-        for travaux in obj.travaux.all().select_related("produit"):
-            item = {
-                "id": travaux.id,
-                "produit_name": travaux.produit.nom_produit,
-                "description": travaux.description or "",
-                "billable": {
-                    "quantite": travaux.quantite,
-                    "prix_unitaire": float(travaux.produit.prix or 0),
-                    "total_ht": float(
-                        travaux.quantite * (float(travaux.produit.prix) or 0.0)
-                    ),
-                },
-                "matiere_usages": [],
-            }
+        """Get work items included in the invoice using InvoiceItemSerializer"""
+        travaux_qs = obj.travaux.all().select_related("produit").prefetch_related("matiere_usages__matiere")
+        return InvoiceItemSerializer(travaux_qs, many=True).data
 
-            for usage in travaux.matiere_usages.all().select_related("matiere"):
-                matiere = usage.matiere
-                prix_unitaire = float(matiere.prix_unitaire or 0.0)
-                item["matiere_usages"].append(
-                    {
-                        "matiere_id": matiere.id,
-                        "nom_matiere": matiere.type_matiere,
-                        "type_matiere": matiere.type_matiere,
-                        "quantite_utilisee": usage.quantite_utilisee,
-                        "prix_unitaire": prix_unitaire,
-                        "total": float(usage.quantite_utilisee * prix_unitaire),
-                    }
-                )
-
-            items.append(item)
-
-        return items
 
     @transaction.atomic
     def create(self, validated_data):
@@ -193,12 +190,12 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
 
         numero_facture = validated_data.get("numero_facture")
         if not numero_facture:
-            year = timezone.now().strftime("%Y")
+            today = timezone.now().strftime("%Y%m%d")
             count = FactureTravaux.objects.filter(
-                numero_facture__startswith=f"FAC-{year}"
+                numero_facture__startswith=f"INV-{today}"
             ).count()
-            numero_facture = f"FAC-{year}-{count + 1:05d}"
-    
+            numero_facture = f"INV-{today}-{count + 1:03d}"
+
         # Create invoice instance without totals initially
         invoice_create_data = {
             "client": client,
@@ -238,6 +235,6 @@ class FactureTravauxDetailSerializer(FactureTravauxSerializer):
     """Detailed serializer with additional fields for invoice retrieval"""
 
     client_name = serializers.CharField(source="client.nom_client", read_only=True)
-
+    code_client= serializers.CharField(source="client.code_client", read_only=True)
     class Meta(FactureTravauxSerializer.Meta):
-        fields = FactureTravauxSerializer.Meta.fields + ("client_name",)
+        fields = FactureTravauxSerializer.Meta.fields + ("client_name","code_client")

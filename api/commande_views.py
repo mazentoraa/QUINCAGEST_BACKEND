@@ -31,35 +31,31 @@ class CommandeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
-            commande = serializer.save()
+         commande = serializer.save()
 
-            # Handle adding products if provided in the request
-            if "produits" in request.data and isinstance(
-                request.data["produits"], list
-            ):
-                for produit_data in request.data["produits"]:
-                    produit_serializer = CommandeProduitSerializer(data=produit_data)
-                    if produit_serializer.is_valid():
-                        ProduitCommande.objects.create(
-                            commande=commande,
-                            produit=produit_serializer.validated_data["produit"],
-                            quantite=produit_serializer.validated_data["quantite"],
-                            prix_unitaire=produit_serializer.validated_data.get(
-                                "prix_unitaire"
-                            ),
-                            remise_pourcentage=produit_serializer.validated_data.get(
-                                "remise_pourcentage", 0
-                            ),
-                        )
-                    else:
-                        # Log error but continue with other products
-                        print(f"Invalid product data: {produit_serializer.errors}")
+        # Ajout des produits
+        if "produits" in request.data and isinstance(request.data["produits"], list):
+             for produit_data in request.data["produits"]:
+                produit_serializer = CommandeProduitSerializer(data=produit_data)
+                if produit_serializer.is_valid():
+                    ProduitCommande.objects.create(
+                        commande=commande,
+                        produit=produit_serializer.validated_data["produit"],
+                        quantite=produit_serializer.validated_data["quantite"],
+                        prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
+                        remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
+                    )
+                else:
+                    print(f"Invalid product data: {produit_serializer.errors}")
 
-            # Calculate totals after adding products
-            commande.calculate_totals()
-            commande.save()
+        # Mise à jour des totaux
+        commande.calculate_totals()
+        commande.save()
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        updated_serializer = self.get_serializer(commande)
+
+        return Response(updated_serializer.data, status=status.HTTP_201_CREATED)
+
 
     @action(detail=True, methods=["post"])
     def add_product(self, request, pk=None):

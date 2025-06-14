@@ -99,6 +99,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source="client.nom_client", read_only=True)
     produit_name = serializers.CharField(source="produit.nom_produit", read_only=True)
     matiere_usages = MatiereUsageSerializer(many=True, required=False)
+    remise = serializers.FloatField(required=False, default=0)
 
     class Meta:
         model = Traveaux
@@ -114,6 +115,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "date_creation",
             "matiere_usages",
             "derniere_mise_a_jour",
+            "remise",
         )
         read_only_fields = (
             "date_creation",
@@ -121,7 +123,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
             "client_name",
             "produit_name",
         )
-        extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True}}
+        extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True},"remise": {"required": False, "default": 0},}
 
     @transaction.atomic
     def create(self, validated_data):

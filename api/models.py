@@ -372,7 +372,10 @@ class Traveaux(models.Model):
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the work was deleted"
     )
-
+    remise = models.FloatField(
+        default=0,
+        help_text="Remise appliquée sur le travail (en DT)"
+    )
     class Meta:
         indexes = [
             models.Index(fields=["client"]),
@@ -1009,7 +1012,8 @@ class ProduitCommande(models.Model):
 
         # Update the commande totals
         self.commande.calculate_totals()
-        self.commande.save()
+        self.commande.save(update_fields=["montant_ht", "montant_tva", "montant_ttc"])
+
 
 
 class Commande(models.Model):
@@ -1029,6 +1033,7 @@ class Commande(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="commandes", help_text="Client"
     )
+    code_client = models.CharField(max_length=20, null=True, blank=True)
     devis = models.OneToOneField(
         Devis,
         on_delete=models.SET_NULL,
@@ -1120,16 +1125,10 @@ class Commande(models.Model):
     def __str__(self):
         return f"Commande {self.numero_commande} - {self.client.nom_client}"
 
+  
+
     def calculate_totals(self):
         """Calculate order totals"""
-        if not self.pk:
-            # Instance not saved yet
-            self.montant_ht = 0
-            self.montant_tva = 0
-            self.montant_ttc = 0
-            return 0
-
-        # Total without tax
         total_ht = sum(
             item.prix_total
             for item in self.produit_commande.all()
@@ -1137,10 +1136,9 @@ class Commande(models.Model):
         )
 
         self.montant_ht = total_ht
-        # Calculate tax
-        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
-        self.montant_tva = total_ht * (tax_rate_float / 100)
+        self.montant_tva = total_ht * (float(self.tax_rate or 0) / 100)
         self.montant_ttc = self.montant_ht + self.montant_tva
+
         return self.montant_ttc
 
     def save(self, *args, **kwargs):
@@ -1148,28 +1146,8 @@ class Commande(models.Model):
         if not self.numero_commande:
             self.numero_commande = self._generate_numero_commande()
 
-        is_new = self.pk is None
-        if is_new and (self.montant_ht is None):
-            self.montant_ht = 0
-            self.montant_tva = 0
-            self.montant_ttc = 0
-
+        # Don't calculate or reset totals here — that logic should live outside save()
         super().save(*args, **kwargs)
-
-        # Calculate totals if needed
-        if (is_new and self.produits.exists()) or (
-            not is_new and self.montant_ht is None
-        ):
-            self.calculate_totals()
-            if self.montant_ht is not None:
-                super().save(
-                    update_fields=[
-                        "montant_ht",
-                        "montant_tva",
-                        "montant_ttc",
-                        "derniere_mise_a_jour",
-                    ]
-                )
 
     def _generate_numero_commande(self):
         """Generate next sequential order number, filling gaps if any exist"""
@@ -1178,21 +1156,16 @@ class Commande(models.Model):
         current_year = datetime.now().year
         prefix = f"FAC-{current_year}-"
 
-        # Get all existing numbers for current year
         existing_commandes = Commande.objects.filter(
             numero_commande__startswith=prefix
         ).values_list('numero_commande', flat=True)
 
-        # Extract the numeric parts
-        existing_numbers = set()
-        for numero in existing_commandes:
-            try:
-                number = int(numero.split("-")[-1])
-                existing_numbers.add(number)
-            except (ValueError, IndexError):
-                continue
+        existing_numbers = {
+            int(numero.split("-")[-1])
+            for numero in existing_commandes
+            if numero.split("-")[-1].isdigit()
+        }
 
-        # Find the first missing number
         next_number = 1
         while next_number in existing_numbers:
             next_number += 1
@@ -1204,7 +1177,6 @@ class Commande(models.Model):
         if self.statut != "completed" or self.facture is not None:
             return None
 
-        # Create invoice
         facture = FactureTravaux.objects.create(
             numero_facture=f"FAC-{self.numero_commande}",
             client=self.client,
@@ -1218,12 +1190,12 @@ class Commande(models.Model):
             conditions_paiement=self.conditions_paiement,
         )
 
-        # Link the invoice to the order
         self.facture = facture
         self.statut = "invoiced"
         self.save(update_fields=["facture", "statut", "derniere_mise_a_jour"])
 
         return facture
+
 
 
 # pour les produits
