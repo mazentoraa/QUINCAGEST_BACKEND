@@ -1057,8 +1057,9 @@ class Commande(models.Model):
         choices=[
             ("traite", "Traite"),
             ("cash", "Comptant"),
-            ("mixte", "Mixte"),
+            ("cheque", "Cheque"),
             ("virement", "Virement"),
+            ("carte", "Carte"),
         ],
         default="cash",
         help_text="Payment method",
@@ -1507,8 +1508,9 @@ class Cd(models.Model):
         choices=[
             ("traite", "Traite"),
             ("cash", "Comptant"),
-            ("mixte", "Mixte"),
+            ("cheque", "Cheque"),
             ("virement", "Virement"),
+            ("carte", "Carte"),
         ],
         default="cash",
         help_text="Payment method",
