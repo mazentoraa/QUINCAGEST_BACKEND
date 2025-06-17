@@ -2,6 +2,9 @@ from datetime import timedelta
 from django.db import models
 import re
 from django.core.exceptions import ValidationError
+from django.utils import timezone
+
+
 
 MATIERE_PREFIXES = {
     "acier": "AC",
@@ -138,67 +141,53 @@ class Matiere(models.Model):
         default="autre",
         help_text="Material type",
     )
-    description = models.TextField(
-        blank=True, null=True, help_text="Material description"
-    )
-    reception_date = models.DateField(
-        help_text="Date of material reception",
-        null=True,
-        blank=True,
-    )
-    thickness = models.IntegerField(
-        help_text="Thickness of the material in mm",
-        null=True,
-        blank=True,
-    )
-    length = models.IntegerField(
-        help_text="Length of the material in mm",
-        null=True,
-        blank=True,
-    )
-    width = models.IntegerField(
-        help_text="Width of the material in mm",
-        null=True,
-        blank=True,
-    )
-    surface = models.IntegerField(
-        help_text="Surface area of the material in m²",
-        null=True,
-        blank=True,
-    )
-    prix_unitaire = models.FloatField(
-        help_text="Unit price of the material",
-        null=True,
-        blank=True,
-    )
-    quantite = models.PositiveIntegerField(
-        default=0, help_text="Quantity in stock"
-    )  # starting quantity
-    remaining_quantity = models.PositiveIntegerField(
-        default=0, help_text="Remaining quantity after work"
-    )
-    date_creation = models.DateTimeField(
-        auto_now_add=True, help_text="Date when the material was created"
-    )
-    derniere_mise_a_jour = models.DateTimeField(
-        auto_now=True, help_text="Date when the material was last updated"
-    )
-    is_deleted = models.BooleanField(default=False, help_text="Material deleted")
-    deleted_at = models.DateTimeField(
-        null=True, blank=True, help_text="Date when the material was deleted"
-    )
+    description = models.TextField(blank=True, null=True, help_text="Material description")
+    reception_date = models.DateField(help_text="Date of material reception", null=True, blank=True)
+    thickness = models.IntegerField(help_text="Thickness in mm", null=True, blank=True)
+    length = models.IntegerField(help_text="Length in mm", null=True, blank=True)
+    width = models.IntegerField(help_text="Width in mm", null=True, blank=True)
+    surface = models.IntegerField(help_text="Surface area (m²)", null=True, blank=True)
+    prix_unitaire = models.FloatField(help_text="Unit price", null=True, blank=True)
+    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock")
+    remaining_quantity = models.PositiveIntegerField(default=0, help_text="Remaining quantity")
+    date_creation = models.DateTimeField(auto_now_add=True)
+    derniere_mise_a_jour = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.type_matiere} - {self.client.nom_client}"
 
     def save(self, *args, **kwargs):
-        # If this is a new instance or remaining_quantity wasn't explicitly set
+        # Initialiser la quantité restante à la création
         if not self.pk or self.remaining_quantity == 0:
             self.remaining_quantity = self.quantite
+
+        # Générer un numero_bon unique s'il est vide
+        if not self.numero_bon:
+            year = timezone.now().year
+            prefix = f"BL-{year}-"
+            last_num = (
+                Matiere.objects
+                .filter(numero_bon__startswith=prefix)
+                .order_by("-numero_bon")
+                .values_list("numero_bon", flat=True)
+                .first()
+            )
+
+            if last_num:
+                try:
+                    last_number = int(last_num.split("-")[-1])
+                except ValueError:
+                    last_number = 0
+            else:
+                last_number = 0
+
+            self.numero_bon = f"{prefix}{str(last_number + 1).zfill(5)}"
+
         super().save(*args, **kwargs)
 
     def update_quantity_after_usage(self, amount_used):
-        """Update quantity after usage in a work"""
         if self.remaining_quantity >= amount_used:
             self.remaining_quantity -= amount_used
             self.save()
