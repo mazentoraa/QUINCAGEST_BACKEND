@@ -46,9 +46,12 @@ class MatiereSerializer(serializers.ModelSerializer):
         )
 
 
+from rest_framework import serializers
+from drf_extra_fields.fields import Base64ImageField
+from .models import Produit
+
 class ProduitSerializer(serializers.ModelSerializer):
-    # Optional: Use Base64ImageField for easier image uploads via API
-    image = Base64ImageField(required=False)
+    image = Base64ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Produit
@@ -67,6 +70,19 @@ class ProduitSerializer(serializers.ModelSerializer):
             "derniere_mise_a_jour",
             "code_produit",
         ]
+        extra_kwargs = {
+            'image': {'required': False, 'allow_null': True},
+        }
+
+    def update(self, instance, validated_data):
+        # Si image=null est envoyé, supprimer l'image existante
+        if 'image' in validated_data and validated_data['image'] is None:
+            if instance.image:
+                instance.image.delete(save=False)
+            instance.image = None
+            validated_data.pop('image')
+
+        return super().update(instance, validated_data)
 
 
 class ClientSerializer(serializers.ModelSerializer):
