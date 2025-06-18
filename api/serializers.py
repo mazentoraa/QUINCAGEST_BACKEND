@@ -24,7 +24,7 @@ class MatiereSerializer(serializers.ModelSerializer):
             "prix_unitaire",
             "date_creation",
             "quantite",
-            "remaining_quantity",
+            "remaining_quantity",  # ✅ doit rester ici
             "derniere_mise_a_jour",
             "width",
             "length",
@@ -38,11 +38,12 @@ class MatiereSerializer(serializers.ModelSerializer):
             "client_id": {"required": True},
             "numero_bon": {"required": False, "allow_null": True, "allow_blank": True},
             "quantite": {"required": True},
+            "remaining_quantity": {"required": False},  # ✅ autorisé en écriture
         }
         read_only_fields = (
             "date_creation",
             "derniere_mise_a_jour",
-            "remaining_quantity",
+          
         )
 
 
