@@ -11,3 +11,4 @@ python manage.py createsuperuser
 
 pip freeze > requirements.txt"Mise … jour du frontend - $(date)"
  jour du frontend - $(date)"
+  jour du frontend - $(date)"
