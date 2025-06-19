@@ -5,22 +5,13 @@ from .models import BonRetour, MatiereRetour, Matiere, Client
 class MatiereForRetourSerializer(serializers.ModelSerializer):
     """Serializer for materials available for return"""
 
-    remaining_quantity = serializers.IntegerField(read_only=True)
-    quantite_retournee = serializers.IntegerField(
-        write_only=True, min_value=1, required=False
-    )
+    nom_matiere = serializers.CharField()
+    quantite_retournee = serializers.IntegerField(min_value=1)
 
     class Meta:
         model = Matiere
         fields = [
-            "id",
-            "type_matiere",
-            "description",
-            "thickness",
-            "length",
-            "width",
-            "surface",
-            "remaining_quantity",
+            "nom_matiere",
             "quantite_retournee",
         ]
         read_only_fields = [
@@ -44,11 +35,10 @@ class MatiereForRetourSerializer(serializers.ModelSerializer):
         return value
 
 
-class MatiereRetourSerializer(serializers.ModelSerializer):
-    """Serializer for MatiereRetour through model"""
+class MatiereRetourFreeSerializer(serializers.Serializer):
+    nom_matiere = serializers.CharField()
+    quantite_retournee = serializers.IntegerField(min_value=1)
 
-    matiere_details = MatiereForRetourSerializer(source="matiere", read_only=True)
-    matiere_id = serializers.IntegerField(write_only=True)
 
     class Meta:
         model = MatiereRetour
@@ -94,7 +84,7 @@ class BonRetourSerializer(serializers.ModelSerializer):
     """Main serializer for BonRetour"""
 
     client_details = ClientBasicSerializer(source="client", read_only=True)
-    matiere_retours = MatiereRetourSerializer(many=True, required=False)
+    matiere_retours = MatiereRetourFreeSerializer(many=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -122,14 +112,16 @@ class BonRetourSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        """Create BonRetour with related MatiereRetour instances"""
-        matiere_retours_data = validated_data.pop("matiere_retours", [])
+        matieres_data = validated_data.pop("matiere_retours", [])
         bon_retour = BonRetour.objects.create(**validated_data)
 
-        # Create MatiereRetour instances
-        for matiere_retour_data in matiere_retours_data:
-            MatiereRetour.objects.create(bon_retour=bon_retour, **matiere_retour_data)
-
+        for mat_data in matieres_data:
+            # This assumes you added nom_matiere/quantite fields to your MatiereRetour model
+            MatiereRetour.objects.create(
+                bon_retour=bon_retour,
+                nom_matiere=mat_data["nom_matiere"],
+                quantite_retournee=mat_data["quantite_retournee"],
+            )
         return bon_retour
 
     def update(self, instance, validated_data):

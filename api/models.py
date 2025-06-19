@@ -616,12 +616,12 @@ class BonRetour(models.Model):
         related_name="bons_retour",
         help_text="Client",
     )
-    matieres = models.ManyToManyField(
-        Matiere,
-        through="MatiereRetour",
-        related_name="bons_retour",
-        help_text="Returned materials",
-    )
+    # matieres = models.ManyToManyField(
+    #     Matiere,
+    #     through="MatiereRetour",
+    #     related_name="bons_retour",
+    #     help_text="Returned materials",
+    # )
 
     status = models.CharField(
         max_length=20,
@@ -670,9 +670,10 @@ class MatiereRetour(models.Model):
     bon_retour = models.ForeignKey(
         "BonRetour", on_delete=models.CASCADE, related_name="matiere_retours"
     )
-    matiere = models.ForeignKey(
-        Matiere, on_delete=models.CASCADE, related_name="retours"
+    matiere = models.ForeignKey( 
+        Matiere, on_delete=models.CASCADE, related_name="retours" , null=True , blank=True
     )
+    nom_matiere = models.CharField(max_length=255, null=True, blank=True)
     quantite_retournee = models.PositiveIntegerField(
         default=1, help_text="Quantity of material returned"
     )
@@ -682,7 +683,7 @@ class MatiereRetour(models.Model):
     )
 
     class Meta:
-        unique_together = ("bon_retour", "matiere")
+        pass
 
     def __str__(self):
         return f"{self.quantite_retournee} of {self.matiere.type_matiere} for Bon Retour {self.bon_retour.numero_bon}"

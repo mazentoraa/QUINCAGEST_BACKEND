@@ -107,44 +107,45 @@ class CommandeDetailSerializer(serializers.ModelSerializer):
         if request and request.method != "GET":
             ret.pop("produits_details", None)
         return ret
-    def create(self, validated_data):
-        produits_data = validated_data.pop("produits", [])
-        tax_rate = validated_data.get("tax_rate", 0)
+def create(self, validated_data):
+    produits_data = validated_data.pop("produits", [])
+    tax_rate = validated_data.get("tax_rate", 0)
 
-        montant_ht = 0
-        for produit_data in produits_data:
-            q = produit_data["quantite"]
-            p = produit_data["prix_unitaire"]
-            remise = produit_data.get("remise_pourcentage", 0)
-            total = q * p * (1 - remise / 100)
-            montant_ht += total
+    montant_ht = 0
+    for produit_data in produits_data:
+        q = produit_data["quantite"]
+        p = produit_data["prix_unitaire"]
+        remise = produit_data.get("remise_pourcentage", 0)
+        total = q * p * (1 - remise / 100)
+        montant_ht += total
 
-        montant_tva = montant_ht * tax_rate / 100
-        montant_ttc = montant_ht + montant_tva
+    montant_tva = montant_ht * tax_rate / 100
+    montant_ttc = montant_ht + montant_tva
 
-        commande = Commande.objects.create(
-            montant_ht=montant_ht,
-            montant_tva=montant_tva,
-            montant_ttc=montant_ttc,
-            **validated_data
+    # ✅ Do not pop montant_ht from validated_data, use the computed one
+    commande = Commande.objects.create(
+        montant_ht=montant_ht,
+        montant_tva=montant_tva,
+        montant_ttc=montant_ttc,
+        **validated_data
+    )
+
+    for produit_data in produits_data:
+        ProduitCommande.objects.create(
+            commande=commande,
+            produit=produit_data["produit"],
+            quantite=produit_data["quantite"],
+            prix_unitaire=produit_data.get("prix_unitaire"),
+            remise_pourcentage=produit_data.get("remise_pourcentage", 0),
+            prix_total=(
+                produit_data["quantite"]
+                * produit_data["prix_unitaire"]
+                * (1 - produit_data.get("remise_pourcentage", 0) / 100)
+            ),
         )
 
-        # Tu peux ajouter les produits à la commande ici aussi :
-        for produit_data in produits_data:
-            ProduitCommande.objects.create(
-                commande=commande,
-                produit=produit_data["produit"],
-                quantite=produit_data["quantite"],
-                prix_unitaire=produit_data.get("prix_unitaire"),
-                remise_pourcentage=produit_data.get("remise_pourcentage", 0),
-                prix_total=(
-                    produit_data["quantite"]
-                    * produit_data["prix_unitaire"]
-                    * (1 - produit_data.get("remise_pourcentage", 0) / 100)
-                ),
-            )
+    return commande
 
-        return commande
 
     def update(self, instance, validated_data):
         produits_data = validated_data.pop("produits", [])
