@@ -109,6 +109,7 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     def perform_create(self, serializer):
+        print("📥 Request data:", self.request.data)
         client_id = self.request.data.get("client_id")
         produit_id = self.request.data.get("produit_id")
         if client_id and produit_id:
