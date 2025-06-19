@@ -144,6 +144,7 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
+        print("🔥 Validated Data:", validated_data)
         client_id = validated_data.pop("client_id")
         produit_id = validated_data.pop("produit_id")
         matiere_usages_data = validated_data.pop("matiere_usages", [])

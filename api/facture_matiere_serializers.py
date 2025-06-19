@@ -46,6 +46,7 @@ class FactureMatiereSerializer(serializers.ModelSerializer):
         return {
             "id": obj.client.id,
             "nom_client": obj.client.nom_client,
+            "code_client":obj.client.code_client,
             "numero_fiscal": obj.client.numero_fiscal,
             "adresse": obj.client.adresse,
             "telephone": obj.client.telephone,
