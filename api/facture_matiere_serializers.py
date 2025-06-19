@@ -62,6 +62,9 @@ class FactureMatiereSerializer(serializers.ModelSerializer):
                 "quantite": m.quantite,
                 "prix_unitaire": float(m.prix_unitaire or 0),
                 "surface": float(m.surface or 0),
+                "width": float(m.width or 0),
+                "length": float(m.length or 0),
+                "thickness": float(m.thickness or 0),
             }
             for m in obj.matieres.all()
         ]
