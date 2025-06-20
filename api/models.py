@@ -1279,9 +1279,10 @@ class Facture(models.Model):
 
 class PlanTraite(models.Model):
     STATUT_CHOICES = [
-        ("EN_COURS", "En cours"),
+        ("NON_PAYEE", "Non payée"),
         ("PAYEE", "Payée"),
     ]
+
 
     facture = models.OneToOneField(
         'FactureTravaux', on_delete=models.CASCADE, null=True, blank=True
@@ -1292,7 +1293,7 @@ class PlanTraite(models.Model):
     numero_facture = models.CharField(max_length=50, blank=True, null=True)
     nombre_traite = models.PositiveIntegerField()
     date_emission = models.DateField(auto_now_add=True)
-    status = models.CharField(max_length=20, choices=STATUT_CHOICES, default="EN_COURS")
+    status = models.CharField(max_length=20, choices=STATUT_CHOICES, default="NON_PAYEE")
     date_premier_echeance = models.DateField(null=True, blank=True)
     periode = models.PositiveIntegerField(null=True, blank=True)
     montant_total = models.FloatField(null=True, blank=True)
@@ -1358,7 +1359,8 @@ class Traite(models.Model):
     date_echeance = models.DateField(help_text="Date d'échéance")
     status = models.CharField(
         max_length=255,
-        default="NON_PAYEE"
+        choices=STATUT_CHOICES, 
+        default="NON_PAYEE"       
     )
     montant = models.FloatField(null=True, blank=True)
 
