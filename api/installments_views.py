@@ -51,6 +51,11 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
             montant_total=montant_total,
             nom_raison_sociale=nom_raison_sociale,
             matricule_fiscal=matricule_fiscal,
+            rip=validated_data.get('rip'),
+            acceptance=validated_data.get('acceptance'),
+            notice=validated_data.get('notice'),
+            bank_name=validated_data.get('bank_name'),
+            bank_address=validated_data.get('bank_address'),
         )
 
         plan._create_traites()

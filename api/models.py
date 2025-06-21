@@ -1309,6 +1309,11 @@ class PlanTraite(models.Model):
         ],
         default="traite"
     )
+    rip = models.CharField(max_length=40, null=True, blank=True)
+    acceptance = models.TextField(null=True, blank=True)
+    notice = models.TextField(null=True, blank=True)
+    bank_name = models.CharField(max_length=255, null=True, blank=True)
+    bank_address = models.TextField(null=True, blank=True)
 
     class Meta:
         ordering = ["-date_emission", "date_premier_echeance"]
