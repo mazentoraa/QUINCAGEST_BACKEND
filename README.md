@@ -9,4 +9,4 @@ python manage.py migrate
 
 python manage.py createsuperuser
 
-pip freeze > requirements.txt"Mise … jour du frontend - $(date)"
+pip freeze > requirements.txt"
