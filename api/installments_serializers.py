@@ -34,11 +34,18 @@ class CreatePlanTraiteSerializer(serializers.Serializer):
     date_premier_echeance = serializers.DateField(required=True)
     periode = serializers.IntegerField(min_value=1, required=False, default=30)
     montant_total = serializers.FloatField(required=False, allow_null=True)
+    rip = serializers.CharField(required=False, allow_blank=True)
+    acceptance = serializers.CharField(required=False, allow_blank=True)
+    notice = serializers.CharField(required=False, allow_blank=True)
+    bank_name = serializers.CharField(required=False, allow_blank=True)
+    bank_address = serializers.CharField(required=False, allow_blank=True)
 
     def validate_numero_commande(self, value):
         if not Cd.objects.filter(numero_commande=value).exists():
             raise serializers.ValidationError("La commande spécifiée n'existe pas.")
         return value
+
+
 
 
 class UpdateTraiteStatusSerializer(serializers.Serializer):
