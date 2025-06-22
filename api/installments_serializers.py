@@ -22,6 +22,8 @@ class PlanTraiteSerializer(serializers.ModelSerializer):
     traites = TraiteSerializer(many=True, read_only=True)
     facture_numero = serializers.CharField(source='numero_facture', read_only=True)
     client_nom = serializers.CharField(source='nom_raison_sociale', read_only=True)
+    bank_name = serializers.CharField(read_only=True)
+    bank_address = serializers.CharField(read_only=True)
 
     class Meta:
         model = PlanTraite
@@ -45,7 +47,28 @@ class CreatePlanTraiteSerializer(serializers.Serializer):
             raise serializers.ValidationError("La commande spécifiée n'existe pas.")
         return value
 
+    def create(self, validated_data):
+        commande = Cd.objects.get(numero_commande=validated_data["numero_commande"])
+        client = commande.client
 
+        plan = PlanTraite.objects.create(
+            facture=commande.facture if hasattr(commande, 'facture') else None,
+            client=client,
+            numero_facture=commande.numero_commande,
+            nom_raison_sociale=client.nom_client,
+            matricule_fiscal=client.numero_fiscal,
+            nombre_traite=validated_data["nombre_traite"],
+            date_premier_echeance=validated_data["date_premier_echeance"],
+            periode=validated_data.get("periode", 30),
+            montant_total=validated_data.get("montant_total"),
+            rip=validated_data.get("rip", ""),
+            acceptance=validated_data.get("acceptance", ""),
+            notice=validated_data.get("notice", ""),
+            bank_name=validated_data.get("bank_name", ""),
+            bank_address=validated_data.get("bank_address", ""),
+        )
+
+        return plan
 
 
 class UpdateTraiteStatusSerializer(serializers.Serializer):

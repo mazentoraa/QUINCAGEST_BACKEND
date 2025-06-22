@@ -25,10 +25,6 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
         validated_data = serializer.validated_data
 
         numero_commande = validated_data.get('numero_commande')
-        nombre_traite = validated_data.get('nombre_traite')
-        date_premier_echeance = validated_data.get('date_premier_echeance')
-        periode = validated_data.get('periode', 30)
-
         try:
             commande = Cd.objects.select_related('client').get(numero_commande=numero_commande)
             client = commande.client
@@ -38,26 +34,24 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        montant_total = validated_data.get('montant_total') or commande.montant_ttc
-        nom_raison_sociale = client.nom_client
-        matricule_fiscal = client.numero_fiscal
-
+        # Création du PlanTraite avec fallback pour montant_total
         plan = PlanTraite.objects.create(
             client=client,
             numero_facture=numero_commande,
-            nombre_traite=nombre_traite,
-            date_premier_echeance=date_premier_echeance,
-            periode=periode,
-            montant_total=montant_total,
-            nom_raison_sociale=nom_raison_sociale,
-            matricule_fiscal=matricule_fiscal,
-            rip=validated_data.get('rip'),
-            acceptance=validated_data.get('acceptance'),
-            notice=validated_data.get('notice'),
-            bank_name=validated_data.get('bank_name'),
-            bank_address=validated_data.get('bank_address'),
+            nombre_traite=validated_data.get('nombre_traite'),
+            date_premier_echeance=validated_data.get('date_premier_echeance'),
+            periode=validated_data.get('periode', 30),
+            montant_total=validated_data.get('montant_total') or commande.montant_ttc,
+            nom_raison_sociale=client.nom_client,
+            matricule_fiscal=client.numero_fiscal,
+            rip=validated_data.get('rip', ''),
+            acceptance=validated_data.get('acceptance', ''),
+            notice=validated_data.get('notice', ''),
+            bank_name=validated_data.get('bank_name', ''),
+            bank_address=validated_data.get('bank_address', '')
         )
 
+        # Création automatique des traites
         plan._create_traites()
         plan.save()
 
@@ -81,16 +75,16 @@ class TraiteViewSet(viewsets.ModelViewSet):
         serializer = UpdateTraiteStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        new_status = serializer.validated_data['status']
-        traite.status = new_status
+        traite.status = serializer.validated_data['status']
         traite.save()
 
+        # Mise à jour du statut du plan selon l'état de toutes ses traites
         plan = traite.plan_traite
-        traites = plan.traites.all()
+        all_status = [t.status for t in plan.traites.all()]
 
-        if all(t.status == 'PAYEE' for t in traites):
+        if all(s == 'PAYEE' for s in all_status):
             plan.status = 'PAYEE'
-        elif any(t.status == 'PAYEE' for t in traites):
+        elif any(s == 'PAYEE' for s in all_status):
             plan.status = 'PARTIELLEMENT_PAYEE'
         else:
             plan.status = 'NON_PAYEE'
