@@ -814,6 +814,13 @@ class Devis(models.Model):
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the quote was deleted"
     )
+        # autres champs existants...
+    timbre_fiscal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.000,  # valeur par défaut du timbre fiscal en MAD ou autre
+        verbose_name="Timbre fiscal"
+    )
 
     class Meta:
         ordering = ["-date_emission", "-numero_devis"]

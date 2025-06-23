@@ -39,6 +39,7 @@ class DevisListSerializer(serializers.ModelSerializer):
             "montant_ht",
             "montant_tva",
             "montant_ttc",
+            "timbre_fiscal",  # ✅ Ajout ici
         ]
         read_only_fields = ["montant_ht", "montant_tva", "montant_ttc"]
 
@@ -67,6 +68,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
             "montant_ht",
             "montant_tva",
             "montant_ttc",
+            "timbre_fiscal",  # ✅ Ajout ici
             "remarques",
             "notes",
             "conditions_paiement",
@@ -83,7 +85,6 @@ class DevisDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_produits_details(self, obj):
-        """Get details about products without creating a through record"""
         produits = Produit.objects.all()
         return [
             {
@@ -97,9 +98,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-        """Override to customize the representation of the devis"""
         ret = super().to_representation(instance)
-        # Remove produits_details from output unless it's a GET request
         request = self.context.get("request")
         if request and request.method != "GET":
             ret.pop("produits_details", None)
@@ -107,8 +106,6 @@ class DevisDetailSerializer(serializers.ModelSerializer):
 
 
 class DevisProduitSerializer(serializers.Serializer):
-    """Serializer to add products to a devis"""
-
     produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
     quantite = serializers.IntegerField(min_value=1)
     prix_unitaire = serializers.FloatField(required=False, allow_null=True)
@@ -116,6 +113,4 @@ class DevisProduitSerializer(serializers.Serializer):
 
 
 class DevisConvertToCommandeSerializer(serializers.Serializer):
-    """Serializer to validate conversion of a devis to commande"""
-
     confirmation = serializers.BooleanField(required=True)
