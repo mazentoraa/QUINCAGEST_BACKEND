@@ -31,12 +31,15 @@ class DevisViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
+            # Récupération de la valeur du timbre fiscal si elle est envoyée
+            timbre_fiscal = request.data.get("timbre_fiscal", None)
+            if timbre_fiscal is not None:
+                serializer.validated_data["timbre_fiscal"] = timbre_fiscal
+
             devis = serializer.save()
 
-            # Handle adding products if provided in the request
-            if "produits" in request.data and isinstance(
-                request.data["produits"], list
-            ):
+            # Ajout des produits si présents
+            if "produits" in request.data and isinstance(request.data["produits"], list):
                 for produit_data in request.data["produits"]:
                     produit_serializer = DevisProduitSerializer(data=produit_data)
                     if produit_serializer.is_valid():
@@ -44,22 +47,17 @@ class DevisViewSet(viewsets.ModelViewSet):
                             devis=devis,
                             produit=produit_serializer.validated_data["produit"],
                             quantite=produit_serializer.validated_data["quantite"],
-                            prix_unitaire=produit_serializer.validated_data.get(
-                                "prix_unitaire"
-                            ),
-                            remise_pourcentage=produit_serializer.validated_data.get(
-                                "remise_pourcentage", 0
-                            ),
+                            prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
+                            remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
                         )
                     else:
-                        # Log error but continue with other products
                         print(f"Invalid product data: {produit_serializer.errors}")
 
-            # Calculate totals after adding products
+            # Calcul des totaux après ajout
             devis.calculate_totals()
             devis.save()
 
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(self.get_serializer(devis).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
     def add_product(self, request, pk=None):
@@ -68,7 +66,6 @@ class DevisViewSet(viewsets.ModelViewSet):
 
         if serializer.is_valid():
             with transaction.atomic():
-                # Check if product already exists in devis
                 produit = serializer.validated_data["produit"]
                 produit_devis, created = ProduitDevis.objects.get_or_create(
                     devis=devis,
@@ -76,26 +73,18 @@ class DevisViewSet(viewsets.ModelViewSet):
                     defaults={
                         "quantite": serializer.validated_data["quantite"],
                         "prix_unitaire": serializer.validated_data.get("prix_unitaire"),
-                        "remise_pourcentage": serializer.validated_data.get(
-                            "remise_pourcentage", 0
-                        ),
+                        "remise_pourcentage": serializer.validated_data.get("remise_pourcentage", 0),
                     },
                 )
 
                 if not created:
-                    # Update existing product
                     produit_devis.quantite = serializer.validated_data["quantite"]
                     if "prix_unitaire" in serializer.validated_data:
-                        produit_devis.prix_unitaire = serializer.validated_data[
-                            "prix_unitaire"
-                        ]
+                        produit_devis.prix_unitaire = serializer.validated_data["prix_unitaire"]
                     if "remise_pourcentage" in serializer.validated_data:
-                        produit_devis.remise_pourcentage = serializer.validated_data[
-                            "remise_pourcentage"
-                        ]
+                        produit_devis.remise_pourcentage = serializer.validated_data["remise_pourcentage"]
                     produit_devis.save()
 
-                # Recalculate devis totals
                 devis.calculate_totals()
                 devis.save()
 
@@ -120,7 +109,6 @@ class DevisViewSet(viewsets.ModelViewSet):
                 )
                 produit_devis.delete()
 
-                # Recalculate devis totals
                 devis.calculate_totals()
                 devis.save()
 
@@ -135,19 +123,16 @@ class DevisViewSet(viewsets.ModelViewSet):
     def convert_to_commande(self, request, pk=None):
         devis = self.get_object()
 
-        # Check if devis is in "accepted" state
         if devis.statut != "accepted":
             return Response(
                 {"error": "Only accepted quotes can be converted to orders"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Validate request data
         serializer = DevisConvertToCommandeSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check confirmation
         if not serializer.validated_data.get("confirmation"):
             return Response(
                 {"error": "Confirmation is required to convert the quote to an order"},
@@ -159,7 +144,6 @@ class DevisViewSet(viewsets.ModelViewSet):
                 commande = devis.convert_to_commande()
                 if commande:
                     from .commande_serializers import CommandeDetailSerializer
-
                     return Response(
                         CommandeDetailSerializer(commande).data,
                         status=status.HTTP_201_CREATED,
