@@ -1775,3 +1775,32 @@ class MatierePurchase(models.Model):
     #     super().save(*args, **kwargs)
 
    
+
+class MatierePremiereAchat(models.Model):
+    ref = models.CharField(max_length=100, unique=True)
+    nom_matiere = models.CharField(max_length=200)
+    categorie = models.CharField(max_length=100, choices=[
+        ("metaux", "Métaux"),
+        ("fixation", "Fixation"),
+        ("plastique", "Plastique"),
+        ("autre", "Autre"),
+    ])
+    description = models.TextField(blank=True, null=True)
+
+    unite_mesure = models.CharField(max_length=10, choices=[
+        ("kg", "Kilogramme"),
+        ("pcs", "Pièce"),
+        ("m2", "Mètre carré"),
+        ("m3", "Mètre cube"),
+    ])
+    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    emplacement = models.CharField(max_length=200, blank=True, null=True)
+
+    fournisseur_principal = models.CharField(max_length=200)
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
+    date_reception = models.DateField()
+    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.ref} - {self.nom_matiere}"

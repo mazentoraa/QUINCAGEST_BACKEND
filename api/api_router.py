@@ -27,7 +27,7 @@ from .cd_views import CdViewSet
 from .facture_views import CommandeProduitViewSet,LineCommandeViewSet,FactureViewSet,PaymentComptantViewSet
 
 from . import dashboard_views
-
+from .views import MatierePremiereAchatViewSet
 
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
@@ -48,6 +48,7 @@ router.register(r"factures_produits", FactureViewSet)
 router.register(r"payments-comptants", PaymentComptantViewSet)
 router.register(r"cds", CdViewSet)
 router.register(r"matiere-purchase", MatierePurchaseViewSet)
+router.register(r'matiere-achat', MatierePremiereAchatViewSet, basename='matiere-achat')
 
 urlpatterns = [
     path("api/", include(router.urls)),

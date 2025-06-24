@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Client, Traveaux, Produit, Matiere, MatiereUsage, Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
+from .models import MatierePremiereAchat
 
 
 class MatiereSerializer(serializers.ModelSerializer):
@@ -238,3 +239,8 @@ class EntrepriseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Entreprise
         fields = "__all__"
+
+class MatierePremiereAchatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MatierePremiereAchat
+        fields = '__all__'
