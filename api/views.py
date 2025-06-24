@@ -20,8 +20,9 @@ from rest_framework.authtoken.models import Token
 from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-
-
+from rest_framework import viewsets, filters
+from .models import MatierePremiereAchat
+from .serializers import MatierePremiereAchatSerializer
 class MatiereViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des matières premières.
@@ -470,3 +471,32 @@ class EntrepriseViewSet(viewsets.ModelViewSet):
             )
 
         return super().update(request, *args, **kwargs) 
+    
+
+
+from rest_framework import viewsets, status, filters
+from rest_framework.response import Response
+from .models import MatierePremiereAchat
+from .serializers import MatierePremiereAchatSerializer
+
+class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
+    queryset = MatierePremiereAchat.objects.all()
+    serializer_class = MatierePremiereAchatSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['ref', 'nom_matiere', 'fournisseur_principal']
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        self.perform_update(serializer)
+        return Response(serializer.data)
