@@ -7,17 +7,20 @@ from .installments_serializers import (
     TraiteSerializer,
     CreatePlanTraiteSerializer,
     UpdateTraiteStatusSerializer,
-    UpdatePlanStatusSerializer  # 🔄 à ajouter dans ton fichier serializers
+    UpdatePlanStatusSerializer,
+    SoftDeletePlanTraiteSerializer  # ✅ NE PAS OUBLIER D’AJOUTER CE SERIALIZER
 )
 
 
 class PlanTraiteViewSet(viewsets.ModelViewSet):
-    queryset = PlanTraite.objects.all().select_related('client')
+    queryset = PlanTraite.objects.filter(is_deleted=False).select_related('client')  # ✅ exclure les supprimés
     serializer_class = PlanTraiteSerializer
 
     def get_serializer_class(self):
         if self.action == 'create':
             return CreatePlanTraiteSerializer
+        elif self.action == 'soft_delete':
+            return SoftDeletePlanTraiteSerializer
         return super().get_serializer_class()
 
     def create(self, request, *args, **kwargs):
@@ -76,6 +79,20 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
             "message": "Statut du plan mis à jour avec succès",
             "plan_id": plan.id,
             "new_status": plan.status
+        }, status=200)
+
+    @action(detail=True, methods=['patch'], url_path='soft-delete')  # ✅ Nouvelle action
+    def soft_delete(self, request, pk=None):
+        plan = self.get_object()
+        serializer = SoftDeletePlanTraiteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        plan.is_deleted = serializer.validated_data['is_deleted']
+        plan.save()
+
+        return Response({
+            "message": "Le plan a été marqué comme supprimé.",
+            "plan_id": plan.id
         }, status=200)
 
 
