@@ -82,3 +82,11 @@ class UpdatePlanStatusSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         return value.upper()
+
+class SoftDeletePlanTraiteSerializer(serializers.Serializer):
+    is_deleted = serializers.BooleanField(default=True)
+
+    def validate_is_deleted(self, value):
+        if not isinstance(value, bool):
+            raise serializers.ValidationError("Ce champ doit être un booléen.")
+        return value
