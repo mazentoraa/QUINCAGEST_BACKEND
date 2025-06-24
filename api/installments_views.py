@@ -6,7 +6,8 @@ from .installments_serializers import (
     PlanTraiteSerializer,
     TraiteSerializer,
     CreatePlanTraiteSerializer,
-    UpdateTraiteStatusSerializer
+    UpdateTraiteStatusSerializer,
+    UpdatePlanStatusSerializer  # 🔄 à ajouter dans ton fichier serializers
 )
 
 
@@ -34,7 +35,6 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Création du PlanTraite avec fallback pour montant_total
         plan = PlanTraite.objects.create(
             client=client,
             numero_facture=numero_commande,
@@ -51,7 +51,6 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
             bank_address=validated_data.get('bank_address', '')
         )
 
-        # Création automatique des traites
         plan._create_traites()
         plan.save()
 
@@ -63,6 +62,21 @@ class PlanTraiteViewSet(viewsets.ModelViewSet):
         traites = plan.traites.all()
         serializer = TraiteSerializer(traites, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['put'], url_path='update-status')
+    def update_status(self, request, pk=None):
+        plan = self.get_object()
+        serializer = UpdatePlanStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        plan.status = serializer.validated_data['status']
+        plan.save()
+
+        return Response({
+            "message": "Statut du plan mis à jour avec succès",
+            "plan_id": plan.id,
+            "new_status": plan.status
+        }, status=200)
 
 
 class TraiteViewSet(viewsets.ModelViewSet):
@@ -78,7 +92,7 @@ class TraiteViewSet(viewsets.ModelViewSet):
         traite.status = serializer.validated_data['status']
         traite.save()
 
-        # Mise à jour du statut du plan selon l'état de toutes ses traites
+        # 🔄 Mise à jour automatique du statut du plan associé
         plan = traite.plan_traite
         all_status = [t.status for t in plan.traites.all()]
 
@@ -91,4 +105,4 @@ class TraiteViewSet(viewsets.ModelViewSet):
 
         plan.save()
 
-        return Response(TraiteSerializer(traite).data)
+        return Response(TraiteSerializer(traite).data, status=200)
