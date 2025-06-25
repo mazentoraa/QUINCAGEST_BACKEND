@@ -238,13 +238,9 @@ class TraveauxSerializer(serializers.ModelSerializer):
 class EntrepriseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Entreprise
-<<<<<<< HEAD
-        fields = "__all__"
-=======
         fields = "__all__"
 
 class MatierePremiereAchatSerializer(serializers.ModelSerializer):
     class Meta:
         model = MatierePremiereAchat
         fields = '__all__'
->>>>>>> 3159651f68c7532d4afa7b67c6091bc38667b999
