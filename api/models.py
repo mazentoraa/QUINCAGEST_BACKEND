@@ -816,7 +816,7 @@ class Devis(models.Model):
     )
         # autres champs existants...
     timbre_fiscal = models.DecimalField(
-        max_digits=11,
+        max_digits=10,
         decimal_places=2,
         default=0.000,  # valeur par défaut du timbre fiscal en MAD ou autre
         verbose_name="Timbre fiscal"
