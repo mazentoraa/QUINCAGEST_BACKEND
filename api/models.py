@@ -1072,6 +1072,7 @@ class Commande(models.Model):
         default="cash",
         help_text="Payment method",
     )
+    type_facture = models.CharField(default="", help_text="Product or Bon invoice")
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
         null=True,
@@ -1142,17 +1143,16 @@ class Commande(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande()
+            self.numero_commande = self._generate_numero_commande(self.type_facture)
 
         # Don't calculate or reset totals here — that logic should live outside save()
         super().save(*args, **kwargs)
 
-    def _generate_numero_commande(self):
+    def _generate_numero_commande(self, type_facture):
         """Generate next sequential order number, filling gaps if any exist"""
         from datetime import datetime
-
         current_year = datetime.now().year
-        prefix = f"FAC-{current_year}-"
+        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
 
         existing_commandes = Commande.objects.filter(
             numero_commande__startswith=prefix
@@ -1532,6 +1532,7 @@ class Cd(models.Model):
         default="cash",
         help_text="Payment method",
     )
+    type_facture = models.CharField(default="", help_text="Product or Bon invoice")
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
         null=True,
@@ -1605,7 +1606,7 @@ class Cd(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande()
+            self.numero_commande = self._generate_numero_commande(self.type_facture)
 
         is_new = self.pk is None
         if is_new and (self.montant_ht is None):
@@ -1630,12 +1631,11 @@ class Cd(models.Model):
                     ]
                 )
 
-    def _generate_numero_commande(self):
+    def _generate_numero_commande(self, type_facture):
         """Generate next sequential order number for current year (never reuses numbers)"""
         from datetime import datetime
-
         current_year = datetime.now().year
-        prefix = f"FAC-{current_year}-"
+        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
 
         # Find the highest existing number for current year
         existing_commandes = Cd.objects.filter(

@@ -68,6 +68,7 @@ class CommandeDetailSerializer(serializers.ModelSerializer):
             "date_livraison_reelle",
             "statut",
             "tax_rate",
+            "type_facture",
             "montant_ht",
             "montant_tva",
             "montant_ttc",
