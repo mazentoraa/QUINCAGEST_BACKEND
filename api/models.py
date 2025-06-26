@@ -1321,6 +1321,7 @@ class PlanTraite(models.Model):
     notice = models.TextField(null=True, blank=True)
     bank_name = models.CharField(max_length=255, null=True, blank=True)
     bank_address = models.TextField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-date_emission", "date_premier_echeance"]
@@ -1356,6 +1357,7 @@ class PlanTraite(models.Model):
                     montant=round(montant_par_traite, 3),
                     status="NON_PAYEE"
                 )
+    
 
 class Traite(models.Model):
     STATUT_CHOICES = [
@@ -1772,6 +1774,8 @@ class MatierePurchase(models.Model):
     #         self.remaining_quantity = self.quantite
     #     super().save(*args, **kwargs)
 
+   
+
 
 class MatierePremiereAchat(models.Model):
     ref = models.CharField(max_length=100, unique=True)
@@ -1829,4 +1833,3 @@ class MatierePremiereAchat(models.Model):
 
     def __str__(self):
         return f"{self.ref} - {self.nom_matiere}"
-
