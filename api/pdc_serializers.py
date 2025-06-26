@@ -79,6 +79,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "montant_ttc",
             "facture",
             "facture_numero",
+            "type_facture",
             "notes",
             "conditions_paiement",
             "date_creation",
