@@ -1776,23 +1776,50 @@ class MatierePurchase(models.Model):
 
    
 
+
 class MatierePremiereAchat(models.Model):
     ref = models.CharField(max_length=100, unique=True)
     nom_matiere = models.CharField(max_length=200)
-    categorie = models.CharField(max_length=100, choices=[
-        ("metaux", "Métaux"),
-        ("fixation", "Fixation"),
-        ("plastique", "Plastique"),
-        ("autre", "Autre"),
-    ])
-    description = models.TextField(blank=True, null=True)
 
-    unite_mesure = models.CharField(max_length=10, choices=[
-        ("kg", "Kilogramme"),
-        ("pcs", "Pièce"),
-        ("m2", "Mètre carré"),
-        ("m3", "Mètre cube"),
-    ])
+    categorie = models.CharField(
+        max_length=100,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+    )
+
+    description = models.TextField(blank=True, null=True)
+    unite_mesure = models.CharField(
+        max_length=10,
+        choices=[
+            ("kg", "Kilogramme"),
+            ("pcs", "Pièce"),
+            ("m2", "Mètre carré"),
+            ("m3", "Mètre cube"),
+        ],
+        default="kg"
+    )
+
+    longueur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
+    )
+    largeur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
+    )
+    epaisseur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
+    )
+    surface = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
+    )
+
     remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     emplacement = models.CharField(max_length=200, blank=True, null=True)
@@ -1801,6 +1828,8 @@ class MatierePremiereAchat(models.Model):
     prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
     date_reception = models.DateField()
     ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.ref} - {self.nom_matiere}"
