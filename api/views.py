@@ -480,14 +480,22 @@ from .models import MatierePremiereAchat
 from .serializers import MatierePremiereAchatSerializer
 
 class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
-    queryset = MatierePremiereAchat.objects.all()
+    queryset = MatierePremiereAchat.objects.all().order_by("-created_at")
     serializer_class = MatierePremiereAchatSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['ref', 'nom_matiere', 'fournisseur_principal']
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        categorie = self.request.query_params.get("categorie")
+        if categorie and categorie != "all":
+            queryset = queryset.filter(categorie=categorie)
+        return queryset
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
+            print("❌ Erreurs de validation (create):", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -497,6 +505,12 @@ class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         if not serializer.is_valid():
+            print("❌ Erreurs de validation (update):", serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         self.perform_update(serializer)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({"message": "Matière supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)

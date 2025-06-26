@@ -376,3 +376,5 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                 "status_summary": status_counts,
             }
         )
+
+

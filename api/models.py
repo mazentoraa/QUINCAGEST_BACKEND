@@ -1072,6 +1072,7 @@ class Commande(models.Model):
         default="cash",
         help_text="Payment method",
     )
+    type_facture = models.CharField(default="", help_text="Product or Bon invoice")
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
         null=True,
@@ -1142,17 +1143,16 @@ class Commande(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande()
+            self.numero_commande = self._generate_numero_commande(self.type_facture)
 
         # Don't calculate or reset totals here — that logic should live outside save()
         super().save(*args, **kwargs)
 
-    def _generate_numero_commande(self):
+    def _generate_numero_commande(self, type_facture):
         """Generate next sequential order number, filling gaps if any exist"""
         from datetime import datetime
-
         current_year = datetime.now().year
-        prefix = f"FAC-{current_year}-"
+        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
 
         existing_commandes = Commande.objects.filter(
             numero_commande__startswith=prefix
@@ -1530,6 +1530,7 @@ class Cd(models.Model):
         default="cash",
         help_text="Payment method",
     )
+    type_facture = models.CharField(default="", help_text="Product or Bon invoice")
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
         null=True,
@@ -1603,7 +1604,7 @@ class Cd(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande()
+            self.numero_commande = self._generate_numero_commande(self.type_facture)
 
         is_new = self.pk is None
         if is_new and (self.montant_ht is None):
@@ -1628,12 +1629,11 @@ class Cd(models.Model):
                     ]
                 )
 
-    def _generate_numero_commande(self):
+    def _generate_numero_commande(self, type_facture):
         """Generate next sequential order number for current year (never reuses numbers)"""
         from datetime import datetime
-
         current_year = datetime.now().year
-        prefix = f"FAC-{current_year}-"
+        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
 
         # Find the highest existing number for current year
         existing_commandes = Cd.objects.filter(
@@ -1772,4 +1772,61 @@ class MatierePurchase(models.Model):
     #         self.remaining_quantity = self.quantite
     #     super().save(*args, **kwargs)
 
-   
+
+class MatierePremiereAchat(models.Model):
+    ref = models.CharField(max_length=100, unique=True)
+    nom_matiere = models.CharField(max_length=200)
+
+    categorie = models.CharField(
+        max_length=100,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+    )
+
+    description = models.TextField(blank=True, null=True)
+    unite_mesure = models.CharField(
+        max_length=10,
+        choices=[
+            ("kg", "Kilogramme"),
+            ("pcs", "Pièce"),
+            ("m2", "Mètre carré"),
+            ("m3", "Mètre cube"),
+        ],
+        default="kg"
+    )
+
+    longueur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
+    )
+    largeur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
+    )
+    epaisseur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
+    )
+    surface = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
+    )
+
+    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    emplacement = models.CharField(max_length=200, blank=True, null=True)
+
+    fournisseur_principal = models.CharField(max_length=200)
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
+    date_reception = models.DateField()
+    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.ref} - {self.nom_matiere}"
+
