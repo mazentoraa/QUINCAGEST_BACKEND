@@ -1321,7 +1321,6 @@ class PlanTraite(models.Model):
     notice = models.TextField(null=True, blank=True)
     bank_name = models.CharField(max_length=255, null=True, blank=True)
     bank_address = models.TextField(null=True, blank=True)
-    is_deleted = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["-date_emission", "date_premier_echeance"]
@@ -1357,7 +1356,6 @@ class PlanTraite(models.Model):
                     montant=round(montant_par_traite, 3),
                     status="NON_PAYEE"
                 )
-    
 
 class Traite(models.Model):
     STATUT_CHOICES = [
@@ -1775,32 +1773,3 @@ class MatierePurchase(models.Model):
     #     super().save(*args, **kwargs)
 
    
-
-class MatierePremiereAchat(models.Model):
-    ref = models.CharField(max_length=100, unique=True)
-    nom_matiere = models.CharField(max_length=200)
-    categorie = models.CharField(max_length=100, choices=[
-        ("metaux", "Métaux"),
-        ("fixation", "Fixation"),
-        ("plastique", "Plastique"),
-        ("autre", "Autre"),
-    ])
-    description = models.TextField(blank=True, null=True)
-
-    unite_mesure = models.CharField(max_length=10, choices=[
-        ("kg", "Kilogramme"),
-        ("pcs", "Pièce"),
-        ("m2", "Mètre carré"),
-        ("m3", "Mètre cube"),
-    ])
-    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    emplacement = models.CharField(max_length=200, blank=True, null=True)
-
-    fournisseur_principal = models.CharField(max_length=200)
-    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
-    date_reception = models.DateField()
-    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.ref} - {self.nom_matiere}"
