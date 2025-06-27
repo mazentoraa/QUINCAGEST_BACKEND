@@ -1087,14 +1087,14 @@ class Commande(models.Model):
         help_text="Total amount including tax",
     )
 
-    facture = models.OneToOneField(
-        FactureTravaux,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="commande_associee",
-        help_text="Associated invoice",
-    )
+    # facture = models.OneToOneField(
+    #     FactureTravaux,
+    #     on_delete=models.SET_NULL,
+    #     null=True,
+    #     blank=True,
+    #     related_name="commande_associee",
+    #     help_text="Associated invoice",
+    # )
 
     notes = models.TextField(
         blank=True, null=True, help_text="Additional notes on the order"
@@ -1491,6 +1491,14 @@ class Cd(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="cd", help_text="Client"
     )
+    facture = models.OneToOneField(
+        FactureTravaux,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="commande_associee",
+        help_text="Associated invoice",
+    )
     devis = models.OneToOneField(
         Devis,
         on_delete=models.SET_NULL,
@@ -1546,14 +1554,11 @@ class Cd(models.Model):
         blank=True,
         help_text="Total amount including tax",
     )
-
-    facture = models.OneToOneField(
+    bons = models.ManyToManyField(
         FactureTravaux,
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
-        related_name="cd_associee",
-        help_text="Associated invoice",
+        related_name="commandes_associees",
+        help_text="Liste des bons liés à cette commande"
     )
 
     notes = models.TextField(
