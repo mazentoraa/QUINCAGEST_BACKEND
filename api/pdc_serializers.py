@@ -54,6 +54,9 @@ class CDetailSerializer(serializers.ModelSerializer):
     devis_numero = serializers.ReadOnlyField(source="devis.numero_devis")
     facture_numero = serializers.ReadOnlyField(source="facture.numero_facture")
     code_client = serializers.ReadOnlyField(source="client.code_client")
+    bons = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=FactureTravaux.objects.all(), required=False
+    )
 
     class Meta:
         model = Cd
@@ -80,6 +83,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "facture",
             "facture_numero",
             "type_facture",
+            "bons",
             "notes",
             "conditions_paiement",
             "date_creation",
