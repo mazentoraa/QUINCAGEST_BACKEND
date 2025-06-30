@@ -72,7 +72,6 @@ class CommandeDetailSerializer(serializers.ModelSerializer):
             "montant_ht",
             "montant_tva",
             "montant_ttc",
-            "facture",
             "facture_numero",
             "notes",
             "conditions_paiement",

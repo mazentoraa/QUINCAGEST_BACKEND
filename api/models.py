@@ -989,8 +989,8 @@ class ProduitCommande(models.Model):
         null=True, blank=True, help_text="Date when the product entry was deleted"
     )
 
-    class Meta:
-        unique_together = ("commande", "produit")
+    # class Meta:
+        # unique_together = ("commande", "produit")
 
     def __str__(self):
         return f"{self.produit.nom_produit} - {self.quantite} units for {self.commande}"
@@ -1703,6 +1703,8 @@ class PdC(models.Model):
         related_name="cd_produits",
         help_text="Product",
     )
+    bon_source = models.ForeignKey(FactureTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
+    bon_numero = models.CharField(max_length=100, null=True, blank=True)
     quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
     prix_unitaire = models.FloatField(
         help_text="Unit price for this product",
@@ -1717,8 +1719,8 @@ class PdC(models.Model):
         null=True, blank=True, help_text="Total price for this product entry"
     )
 
-    class Meta:
-        unique_together = ("cd", "produit")
+    # class Meta:
+    #     unique_together = ("cd", "produit")
 
     def __str__(self):
         return f"{self.produit.nom_produit} - {self.quantite} units for {self.cd}"
