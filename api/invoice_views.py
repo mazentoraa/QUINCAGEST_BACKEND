@@ -100,6 +100,14 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                                 type=openapi.TYPE_NUMBER,
                                 description="Unit price of product (for reference)",
                             ),
+                            "remise_produit": openapi.Schema(
+                                type=openapi.TYPE_NUMBER,
+                                description="Discount value per product",
+                            ),
+                            "remise_percent_produit": openapi.Schema(
+                                type=openapi.TYPE_NUMBER,
+                                description="Discount rate per product",
+                            ),
                             "matiere_usages": openapi.Schema(
                                 type=openapi.TYPE_ARRAY,
                                 items=openapi.Schema(
@@ -156,6 +164,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                     type=openapi.TYPE_STRING, format=openapi.FORMAT_DATE, nullable=True
                 ),
                 "tax_rate": openapi.Schema(type=openapi.TYPE_NUMBER, default=20),
+                "timbre_fiscal": openapi.Schema(type=openapi.TYPE_NUMBER, default=1),
                 "statut": openapi.Schema(
                     type=openapi.TYPE_STRING,
                     enum=["draft", "sent", "paid", "cancelled"],

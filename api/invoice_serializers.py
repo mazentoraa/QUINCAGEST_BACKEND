@@ -27,7 +27,9 @@ class InvoiceItemSerializer(serializers.Serializer):
     description_produit = serializers.CharField(source="produit.description", read_only=True)
     
     description = serializers.CharField(allow_blank=True, required=False)
-    remise = serializers.FloatField(read_only=True)
+
+    remise_produit = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    remise_percent_produit = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
 
     billable = serializers.SerializerMethodField()
     matiere_usages = MatiereUsageInvoiceSerializer(many=True, required=False)
@@ -35,21 +37,20 @@ class InvoiceItemSerializer(serializers.Serializer):
     def get_billable(self, obj):
         quantite = obj.quantite
         prix_unitaire = float(obj.produit.prix or 0)
-        remise = float(obj.remise or 0)
+        remise_percent = float(obj.remise_percent_produit or 0)
 
         total_ht = quantite * prix_unitaire
-        total_remise = total_ht * remise / 100
+        total_remise = total_ht * remise_percent / 100
         total_after_remise = total_ht - total_remise
 
         return {
             "quantite": quantite,
             "prix_unitaire": prix_unitaire,
-            "remise_percent": remise,
+            "remise_percent": remise_percent,
             "total_ht_brut": round(total_ht, 2),
             "total_remise": round(total_remise, 2),
             "total_ht": round(total_after_remise, 2),
         }
-
 
 class FactureTravauxSerializer(serializers.ModelSerializer):
     """Serializer for the invoice model"""
@@ -87,6 +88,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "date_echeance",
             "date_generated",
             "tax_rate",
+            "timbre_fiscal",
             "total_ht",
             "total_tax",
             "total_ttc",
@@ -165,6 +167,10 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
                     {"line_items": "Each line item must have a 'work_id'."}
                 )
             travaux_ids.append(work_id)
+            travaux = Traveaux.objects.get(id=work_id)
+            travaux.remise_produit = item.get("remise_produit", 0)
+            travaux.remise_percent_produit = item.get("remise_percent_produit", 0)
+            travaux.save()
 
         unique_travaux_ids = list(set(travaux_ids))
 
@@ -188,6 +194,8 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         if tax_rate is None:
             raise serializers.ValidationError({"tax_rate": "Tax rate is required."})
 
+        timbre_fiscal = validated_data.pop("timbre_fiscal", None)
+
         numero_facture = validated_data.get("numero_facture")
         if not numero_facture:
             today = timezone.now().strftime("%Y%m%d")
@@ -204,6 +212,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
             "statut": validated_data.get("statut", "draft"),
             "numero_facture": numero_facture,
             "tax_rate": tax_rate,
+            "timbre_fiscal": timbre_fiscal,
             "notes": validated_data.get("notes"),
             "conditions_paiement": validated_data.get("conditions_paiement"),
         }
@@ -211,10 +220,9 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         invoice_create_data = {
             k: v for k, v in invoice_create_data.items() if v is not None
         }
-
         invoice = FactureTravaux(**invoice_create_data)
         invoice.save()
-
+    
         invoice.travaux.set(travaux_list)
 
         # Now call calculate_totals with fresh data (the model method now uses select_related)
