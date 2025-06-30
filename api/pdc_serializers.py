@@ -7,17 +7,7 @@ class PdCSerializer(serializers.ModelSerializer):
     code_produit = serializers.ReadOnlyField(source="produit.code_produit")
     class Meta:
         model = PdC
-        fields = [
-            "id",
-            "produit",
-            "nom_produit",
-            "code_produit",
-            "quantite",
-            "prix_unitaire",
-            "remise_pourcentage",
-            "prix_total",
-            "timbre_fiscal",
-        ]
+        fields = '__all__'
         read_only_fields = ["prix_total"]
 
 
@@ -111,7 +101,8 @@ class CdPSerializer(serializers.Serializer):
     quantite = serializers.IntegerField(min_value=1)
     prix_unitaire = serializers.FloatField(required=False, allow_null=True)
     remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
-
+    bonId = serializers.IntegerField(required=False, allow_null=True)
+    bon_numero = serializers.CharField(required=False, allow_blank=True)
 
 class CdGenerateInvoiceSerializer(serializers.Serializer):
     """Serializer to validate generating an invoice from an order"""
