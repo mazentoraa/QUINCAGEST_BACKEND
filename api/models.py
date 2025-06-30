@@ -3,8 +3,7 @@ from django.db import models
 import re
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-
-
+from decimal import Decimal, ROUND_HALF_UP
 
 MATIERE_PREFIXES = {
     "acier": "AC",
@@ -349,6 +348,14 @@ class Traveaux(models.Model):
     quantite = models.FloatField(
         default=1, help_text="Quantity of the product used for the work"
     )
+    remise_produit = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Discount value applied on this product"
+    )
+    remise_percent_produit = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0,
+        help_text="Percentage discount on this product"
+    )
     description = models.TextField(blank=True, null=True, help_text="Work description")
 
     date_creation = models.DateTimeField(
@@ -404,6 +411,7 @@ class FactureTravaux(models.Model):
     )
 
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
+    timbre_fiscal = models.DecimalField(max_digits=10, decimal_places=3, default=0)
     montant_ht = models.FloatField(
         null=True,
         blank=True,
@@ -447,35 +455,64 @@ class FactureTravaux(models.Model):
     def __str__(self):
         return f"Facture {self.numero_facture}"
 
+    from decimal import Decimal
+
+    from decimal import Decimal, ROUND_HALF_UP
+
     def calculate_totals(self):
-        """Calculate invoice totals"""
+        print("🧾 Calculating totals for invoice id:", self.pk)
+        print("Tax rate:", self.tax_rate)
+        print("Timbre fiscal:", getattr(self, 'timbre_fiscal', None))
+        print("Travaux linked:")
+
         if not self.pk:
-            # Instance not saved yet, or no travaux linked.
             self.montant_ht = 0
             self.montant_tva = 0
             self.montant_ttc = 0
             return 0
 
-        total_ht = 0
-        # Use select_related to ensure we get fresh product data
-        for travail in self.travaux.select_related("produit").all():
-            # Add product costs
-            if travail.produit and travail.produit.prix is not None:
-                total_ht += float(travail.produit.prix) * travail.quantite
+        total_brut = Decimal("0.0")
+        total_remise = Decimal("0.0")
+        total_ht = Decimal("0.0")
 
-            # Add material costs if they exist
-            for usage in travail.matiere_usages.select_related("matiere").all():
+        for travail in self.travaux.select_related("produit").prefetch_related("matiere_usages__matiere"):
+            print(f" - Travail id {travail.id}: produit id {travail.produit.id if travail.produit else 'None'}, prix: {travail.produit.prix if travail.produit else 'N/A'}, quantite: {travail.quantite}")
+            print(f"   Remise produit: {travail.remise_produit}, remise_percent_produit: {travail.remise_percent_produit}")
+
+            if travail.produit and travail.produit.prix is not None:
+                prix_unitaire = Decimal(travail.produit.prix)
+                quantite = Decimal(travail.quantite)
+                remise_percent = Decimal(travail.remise_percent_produit or 0)
+
+                line_total_brut = prix_unitaire * quantite
+                remise_value = (line_total_brut * remise_percent / Decimal("100")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+                line_total_ht = line_total_brut - remise_value
+
+                total_brut += line_total_brut
+                total_remise += remise_value
+                total_ht += line_total_ht
+
+                print(f"   Line total brut: {line_total_brut}, remise value: {remise_value}, line total ht: {line_total_ht}")
+
+            for usage in travail.matiere_usages.all():
                 if usage.matiere and usage.matiere.prix_unitaire is not None:
-                    total_ht += (
-                        float(usage.matiere.prix_unitaire) * usage.quantite_utilisee
-                    )
+                    pu = Decimal(usage.matiere.prix_unitaire)
+                    qte = Decimal(usage.quantite_utilisee)
+                    total_ht += pu * qte
+
+        print(f"Total brut: {total_brut}, Total remise: {total_remise}, Total HT: {total_ht}")
+
+        tax_rate = Decimal(self.tax_rate or 0)
+        fodec = (total_ht * Decimal('0.01')).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+        timbre = Decimal(getattr(self, 'timbre_fiscal', 0))
 
         self.montant_ht = total_ht
-        # Ensure tax_rate is a float for calculation
-        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
-        self.montant_tva = total_ht * (tax_rate_float / 100)
-        self.montant_ttc = self.montant_ht + self.montant_tva
+        self.montant_tva = (total_ht + fodec) * (tax_rate / 100)
+        self.montant_ttc = total_ht + fodec + self.montant_tva + timbre
+
         return self.montant_ttc
+
+
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
@@ -989,8 +1026,8 @@ class ProduitCommande(models.Model):
         null=True, blank=True, help_text="Date when the product entry was deleted"
     )
 
-    class Meta:
-        unique_together = ("commande", "produit")
+    # class Meta:
+        # unique_together = ("commande", "produit")
 
     def __str__(self):
         return f"{self.produit.nom_produit} - {self.quantite} units for {self.commande}"
@@ -1703,6 +1740,8 @@ class PdC(models.Model):
         related_name="cd_produits",
         help_text="Product",
     )
+    bon_source = models.ForeignKey(FactureTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
+    bon_numero = models.CharField(max_length=100, null=True, blank=True)
     quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
     prix_unitaire = models.FloatField(
         help_text="Unit price for this product",
@@ -1717,8 +1756,8 @@ class PdC(models.Model):
         null=True, blank=True, help_text="Total price for this product entry"
     )
 
-    class Meta:
-        unique_together = ("cd", "produit")
+    # class Meta:
+    #     unique_together = ("cd", "produit")
 
     def __str__(self):
         return f"{self.produit.nom_produit} - {self.quantite} units for {self.cd}"
