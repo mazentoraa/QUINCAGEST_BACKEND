@@ -4,7 +4,6 @@ from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 from .models import MatierePremiereAchat
 
-
 class MatiereSerializer(serializers.ModelSerializer):
     client_id = serializers.PrimaryKeyRelatedField(
         queryset=Client.objects.all(), source="client"
@@ -243,4 +242,102 @@ class EntrepriseSerializer(serializers.ModelSerializer):
 class MatierePremiereAchatSerializer(serializers.ModelSerializer):
     class Meta:
         model = MatierePremiereAchat
+        fields = '__all__'
+
+from rest_framework import serializers
+from .models import FactureAchatMatiere, Achat
+
+
+class AchatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Achat
+        fields = ['id', 'nom', 'prix', 'quantite']
+
+
+class FactureAchatMatiereSerializer(serializers.ModelSerializer):
+    achats = AchatSerializer(many=True)
+
+    class Meta:
+        model = FactureAchatMatiere
+        fields = ['id', 'numero', 'fournisseur', 'type_achat', 'prix_total', 'date_facture', 'achats']
+
+    def create(self, validated_data):
+        achats_data = validated_data.pop('achats', [])
+        facture = FactureAchatMatiere.objects.create(**validated_data)
+        for achat_data in achats_data:
+            Achat.objects.create(facture=facture, **achat_data)
+        return facture
+
+    def update(self, instance, validated_data):
+        achats_data = validated_data.pop('achats', [])
+
+        # mettre à jour les champs de la facture
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # supprimer les anciens achats liés
+        instance.achats.all().delete()
+
+        # recréer les nouveaux achats
+        for achat_data in achats_data:
+            Achat.objects.create(facture=instance, **achat_data)
+
+        return instance
+
+
+
+from .models import BonLivraisonMatiere, Livraison
+
+
+class LivraisonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Livraison
+        fields = ['id', 'nom', 'prix', 'quantite']
+
+
+class BonLivraisonMatiereSerializer(serializers.ModelSerializer):
+    livraisons = LivraisonSerializer(many=True)
+
+    class Meta:
+        model = BonLivraisonMatiere
+        fields = ['id', 'numero', 'fournisseur', 'type_achat', 'prix_total', 'date_livraison', 'livraisons']
+
+    def create(self, validated_data):
+        livraisons_data = validated_data.pop('livraisons', [])
+        bon = BonLivraisonMatiere.objects.create(**validated_data)
+        for livraison_data in livraisons_data:
+            Livraison.objects.create(bon=bon, **livraison_data)
+        return bon
+
+    def update(self, instance, validated_data):
+        livraisons_data = validated_data.pop('livraisons', [])
+
+        # Mise à jour des champs du bon
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Supprimer les anciennes livraisons
+        instance.livraisons.all().delete()
+
+        # Créer les nouvelles livraisons
+        for livraison_data in livraisons_data:
+            Livraison.objects.create(bon=instance, **livraison_data)
+
+        return instance
+
+from .models import Fournisseur
+
+class FournisseurSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Fournisseur
+        fields = '__all__'
+
+
+from .models import Consommable
+
+class ConsommableSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Consommable
         fields = '__all__'
