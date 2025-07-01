@@ -23,6 +23,7 @@ from drf_yasg import openapi
 from rest_framework import viewsets, filters
 from .models import MatierePremiereAchat
 from .serializers import MatierePremiereAchatSerializer
+
 class MatiereViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des matières premières.
@@ -514,3 +515,41 @@ class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response({"message": "Matière supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+from rest_framework import viewsets
+from .models import FactureAchatMatiere
+from .serializers import FactureAchatMatiereSerializer
+
+class FactureAchatMatiereViewSet(viewsets.ModelViewSet):
+    queryset = FactureAchatMatiere.objects.all().order_by('-id')
+    serializer_class = FactureAchatMatiereSerializer
+
+
+from rest_framework import viewsets
+from .models import BonLivraisonMatiere
+from .serializers import BonLivraisonMatiereSerializer
+
+class BonLivraisonMatiereViewSet(viewsets.ModelViewSet):
+    queryset = BonLivraisonMatiere.objects.all().order_by('-id')
+    serializer_class = BonLivraisonMatiereSerializer
+
+
+
+from .models import Fournisseur
+from .serializers import FournisseurSerializer
+
+class FournisseurViewSet(viewsets.ModelViewSet):
+    queryset = Fournisseur.objects.all()
+    serializer_class = FournisseurSerializer
+
+
+
+from .models import Consommable
+from .serializers import ConsommableSerializer
+
+class ConsommableViewSet(viewsets.ModelViewSet):
+    queryset = Consommable.objects.all().order_by('-date_achat')
+    serializer_class = ConsommableSerializer

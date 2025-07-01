@@ -1877,3 +1877,84 @@ class MatierePremiereAchat(models.Model):
 
     def __str__(self):
         return f"{self.ref} - {self.nom_matiere}"
+
+
+class FactureAchatMatiere(models.Model):
+    numero = models.CharField(max_length=100, blank=True, null=True)
+    fournisseur = models.CharField(max_length=255, blank=True, null=True)
+
+    TYPE_ACHAT_CHOICES = [
+        ('matière première', 'matière première'),
+        ('consommable', 'consommable'),
+        ('autres', 'autres'),
+    ]
+    type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
+
+    prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    date_facture = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Facture {self.numero or self.id}"
+
+
+class Achat(models.Model):
+    facture = models.ForeignKey(FactureAchatMatiere, on_delete=models.CASCADE, related_name='achats')
+    nom = models.CharField(max_length=255)
+    prix = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.nom} x {self.quantite} (Facture {self.facture.numero or self.facture.id})"
+
+from django.db import models
+
+class BonLivraisonMatiere(models.Model):
+    numero = models.CharField(max_length=100, blank=True, null=True)
+    fournisseur = models.CharField(max_length=255, blank=True, null=True)
+
+    TYPE_ACHAT_CHOICES = [
+        ('matière première', 'matière première'),
+        ('consommable', 'consommable'),
+        ('autres', 'autres'),
+    ]
+    type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
+
+    prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    date_livraison = models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Bon {self.numero or self.id}"
+
+
+class Livraison(models.Model):
+    bon = models.ForeignKey(BonLivraisonMatiere, on_delete=models.CASCADE, related_name='livraisons')
+    nom = models.CharField(max_length=255)
+    prix = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.nom} x {self.quantite} (Bon {self.bon.numero or self.bon.id})"
+
+
+class Fournisseur(models.Model):
+    nom = models.CharField(max_length=255)
+    num_reg_fiscal = models.CharField(max_length=100, unique=True)
+    adresse = models.CharField(max_length=500)
+    telephone = models.CharField(max_length=20)
+    infos_complementaires = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.nom
+
+
+
+
+class Consommable(models.Model):
+    nom = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=2)
+    quantite = models.PositiveIntegerField()
+    date_achat = models.DateField()
+
+    def __str__(self):
+        return self.nom
