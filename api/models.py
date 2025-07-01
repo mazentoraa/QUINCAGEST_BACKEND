@@ -455,9 +455,6 @@ class FactureTravaux(models.Model):
     def __str__(self):
         return f"Facture {self.numero_facture}"
 
-    from decimal import Decimal
-
-    from decimal import Decimal, ROUND_HALF_UP
 
     def calculate_totals(self):
         print("🧾 Calculating totals for invoice id:", self.pk)
@@ -871,28 +868,40 @@ class Devis(models.Model):
     def __str__(self):
         return f"Devis {self.numero_devis} - {self.client.nom_client}"
 
-    def calculate_totals(self):
-        """Calculate quote totals"""
-        if not self.pk:
-            # Instance not saved yet
-            self.montant_ht = 0
-            self.montant_tva = 0
-            self.montant_ttc = 0
-            return 0
 
-        # Total without tax
-        total_ht = sum(
-            item.prix_total
-            for item in self.produit_devis.all()
-            if item.prix_total is not None
-        )
+    def calculate_totals(self):
+        print("Calculating totals for Devis ID:", self.pk)
+        print("Tax rate:", self.tax_rate)
+
+        if not self.pk:
+            self.montant_ht = Decimal("0.0")
+            self.montant_tva = Decimal("0.0")
+            self.montant_ttc = Decimal("0.0")
+            return Decimal("0.0")
+
+        total_ht = Decimal("0.0")
+
+        for item in self.produit_devis.all():
+            if item.prix_total is not None:
+                total_ht += Decimal(item.prix_total)
+
+        print("Total HT:", total_ht)
+
+        tax_rate = Decimal(self.tax_rate or 0)
+        fodec = (total_ht * Decimal("0.01")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        timbre = Decimal(getattr(self, 'timbre_fiscal', 0))
+
+        montant_tva = ((total_ht + fodec) * tax_rate / Decimal("100")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        montant_ttc = total_ht + fodec + montant_tva + timbre
 
         self.montant_ht = total_ht
-        # Calculate tax
-        tax_rate_float = float(self.tax_rate if self.tax_rate is not None else 0)
-        self.montant_tva = total_ht * (tax_rate_float / 100)
-        self.montant_ttc = self.montant_ht + self.montant_tva
+        self.montant_tva = montant_tva
+        self.montant_ttc = montant_ttc
+        print(f"FODEC: {fodec}, TVA: {montant_tva}, Timbre: {timbre}, TTC: {montant_ttc}")
+
         return self.montant_ttc
+
+
 
     def save(self, *args, **kwargs):
         # Set validity date if not set (15 days from emission)
@@ -1161,21 +1170,45 @@ class Commande(models.Model):
     def __str__(self):
         return f"Commande {self.numero_commande} - {self.client.nom_client}"
 
-  
-
     def calculate_totals(self):
-        """Calculate order totals"""
-        total_ht = sum(
-            item.prix_total
-            for item in self.produit_commande.all()
-            if item.prix_total is not None
-        )
+        print("Calculating totals for Commande ID:", self.pk)
+        print("Tax rate:", self.tax_rate)
 
+        if not self.pk:
+            self.montant_ht = 0
+            self.montant_tva = 0
+            self.montant_ttc = 0
+            return 0
+
+        total_brut = Decimal("0.0")
+        total_remise = Decimal("0.0")
+        total_ht = Decimal("0.0")
+
+        for item in self.produit_commande.select_related("produit").all():
+            prix_unitaire = Decimal(item.prix_unitaire or 0)
+            quantite = Decimal(item.quantite or 0)
+            remise_percent = Decimal(item.remise_pourcentage or 0)
+
+            line_total_brut = prix_unitaire * quantite
+            remise_value = (line_total_brut * remise_percent / Decimal("100")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+            line_total_ht = line_total_brut - remise_value
+
+            total_brut += line_total_brut
+            total_remise += remise_value
+            total_ht += line_total_ht
+
+            print(f" - ProduitCommande id {item.id}: PU={prix_unitaire}, QTE={quantite}, Remise%={remise_percent}")
+            print(f"   => Brut={line_total_brut}, Remise={remise_value}, HT={line_total_ht}")
+
+        print(f"Total brut: {total_brut}, Total remise: {total_remise}, Total HT: {total_ht}")
+
+        tax_rate = Decimal(self.tax_rate or 0)
         self.montant_ht = total_ht
-        self.montant_tva = total_ht * (float(self.tax_rate or 0) / 100)
-        self.montant_ttc = self.montant_ht + self.montant_tva
+        self.montant_tva = (total_ht * tax_rate / Decimal("100")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
+        self.montant_ttc = (total_ht + self.montant_tva).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
 
         return self.montant_ttc
+
 
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided

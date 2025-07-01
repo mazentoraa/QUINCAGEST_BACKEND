@@ -39,7 +39,7 @@ class DevisListSerializer(serializers.ModelSerializer):
             "montant_ht",
             "montant_tva",
             "montant_ttc",
-            "timbre_fiscal",  # ✅ Ajout ici
+            "timbre_fiscal",  
         ]
         read_only_fields = ["montant_ht", "montant_tva", "montant_ttc"]
 
@@ -68,7 +68,7 @@ class DevisDetailSerializer(serializers.ModelSerializer):
             "montant_ht",
             "montant_tva",
             "montant_ttc",
-            "timbre_fiscal",  # ✅ Ajout ici
+            "timbre_fiscal",  
             "remarques",
             "notes",
             "conditions_paiement",

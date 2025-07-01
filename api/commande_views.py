@@ -29,7 +29,7 @@ class CommandeViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
+        print(request.data)
         with transaction.atomic():
          commande = serializer.save()
 
