@@ -1867,6 +1867,7 @@ class MatierePremiereAchat(models.Model):
             ("laiton", "Laiton"),
             ("cuivre", "Cuivre"),
             ("acier_galvanise", "Acier galvanisé"),
+            ("metaux","Metaux"),
             ("autre", "Autre"),
         ],
         default="autre",
