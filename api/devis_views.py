@@ -31,13 +31,14 @@ class DevisViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         with transaction.atomic():
+            # Récupération de la valeur du timbre fiscal si elle est envoyée
             timbre_fiscal = request.data.get("timbre_fiscal", None)
             if timbre_fiscal is not None:
                 serializer.validated_data["timbre_fiscal"] = timbre_fiscal
 
             devis = serializer.save()
 
-            # ✅ Add products before calculating totals
+            # Ajout des produits si présents
             if "produits" in request.data and isinstance(request.data["produits"], list):
                 for produit_data in request.data["produits"]:
                     produit_serializer = DevisProduitSerializer(data=produit_data)
@@ -52,11 +53,11 @@ class DevisViewSet(viewsets.ModelViewSet):
                     else:
                         print(f"Invalid product data: {produit_serializer.errors}")
 
+            # Calcul des totaux après ajout
             devis.calculate_totals()
             devis.save()
 
         return Response(self.get_serializer(devis).data, status=status.HTTP_201_CREATED)
-
 
     @action(detail=True, methods=["post"])
     def add_product(self, request, pk=None):

@@ -983,7 +983,9 @@ class Devis(models.Model):
             montant_ht=self.montant_ht,
             montant_tva=self.montant_tva,
             montant_ttc=self.montant_ttc,
+            timbre_fiscal=self.timbre_fiscal, 
             notes=self.notes,
+            remarques=self.remarques,  
             conditions_paiement=self.conditions_paiement,
         )
 
@@ -1145,6 +1147,12 @@ class Commande(models.Model):
     notes = models.TextField(
         blank=True, null=True, help_text="Additional notes on the order"
     )
+    remarques = models.TextField(
+    blank=True,
+    null=True,
+    help_text="Remarques standard sur la commande"
+)
+
     conditions_paiement = models.TextField(
         blank=True, null=True, help_text="Payment terms and conditions"
     )
