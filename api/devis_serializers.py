@@ -114,3 +114,5 @@ class DevisProduitSerializer(serializers.Serializer):
 
 class DevisConvertToCommandeSerializer(serializers.Serializer):
     confirmation = serializers.BooleanField(required=True)
+    timbre_fiscal = serializers.DecimalField(required=False, max_digits=10, decimal_places=3)
+    notes = serializers.CharField(required=False, allow_blank=True)
