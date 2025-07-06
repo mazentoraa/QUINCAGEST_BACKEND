@@ -52,6 +52,7 @@ class CDetailSerializer(serializers.ModelSerializer):
         model = Cd
         fields = [
             "id",
+            "nature",
             "numero_commande",
             "client",
             "nom_client",
