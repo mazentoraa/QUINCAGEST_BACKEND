@@ -390,6 +390,12 @@ class FactureTravaux(models.Model):
         ("paid", "Payée"),
         ("cancelled", "Annulée"),
     ]
+    FACTURE_TYPES = (
+        ('facture', 'Facture'),
+        ('avoir', 'Avoir'),
+    )
+    
+    nature = models.CharField(max_length=10, choices=FACTURE_TYPES, default='facture')
 
     numero_facture = models.CharField(
         max_length=50, unique=True, help_text="Invoice number"
@@ -457,10 +463,6 @@ class FactureTravaux(models.Model):
 
 
     def calculate_totals(self):
-        print("🧾 Calculating totals for invoice id:", self.pk)
-        print("Tax rate:", self.tax_rate)
-        print("Timbre fiscal:", getattr(self, 'timbre_fiscal', None))
-        print("Travaux linked:")
 
         if not self.pk:
             self.montant_ht = 0
@@ -473,8 +475,6 @@ class FactureTravaux(models.Model):
         total_ht = Decimal("0.0")
 
         for travail in self.travaux.select_related("produit").prefetch_related("matiere_usages__matiere"):
-            print(f" - Travail id {travail.id}: produit id {travail.produit.id if travail.produit else 'None'}, prix: {travail.produit.prix if travail.produit else 'N/A'}, quantite: {travail.quantite}")
-            print(f"   Remise produit: {travail.remise_produit}, remise_percent_produit: {travail.remise_percent_produit}")
 
             if travail.produit and travail.produit.prix is not None:
                 prix_unitaire = Decimal(travail.produit.prix)
@@ -489,19 +489,20 @@ class FactureTravaux(models.Model):
                 total_remise += remise_value
                 total_ht += line_total_ht
 
-                print(f"   Line total brut: {line_total_brut}, remise value: {remise_value}, line total ht: {line_total_ht}")
-
             for usage in travail.matiere_usages.all():
                 if usage.matiere and usage.matiere.prix_unitaire is not None:
                     pu = Decimal(usage.matiere.prix_unitaire)
                     qte = Decimal(usage.quantite_utilisee)
                     total_ht += pu * qte
-
-        print(f"Total brut: {total_brut}, Total remise: {total_remise}, Total HT: {total_ht}")
-
         tax_rate = Decimal(self.tax_rate or 0)
-        fodec = (total_ht * Decimal('0.01')).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
-        timbre = Decimal(getattr(self, 'timbre_fiscal', 0))
+
+        # Facture ou avoir
+        if self.nature == 'facture':
+            fodec = (total_ht * Decimal('0.01')).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+            timbre = Decimal(getattr(self, 'timbre_fiscal', 0))
+        else:
+            fodec = 0
+            timbre = 0
 
         self.montant_ht = total_ht
         self.montant_tva = (total_ht + fodec) * (tax_rate / 100)
@@ -1221,12 +1222,12 @@ class Commande(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande(self.type_facture)
+            self.numero_commande = self._generate_numero_commande(self.type_facture, self.nature)
 
         # Don't calculate or reset totals here — that logic should live outside save()
         super().save(*args, **kwargs)
 
-    def _generate_numero_commande(self, type_facture):
+    def _generate_numero_commande(self, type_facture, nature):
         """Generate next sequential order number, filling gaps if any exist"""
         from datetime import datetime
         current_year = datetime.now().year
@@ -1254,7 +1255,7 @@ class Commande(models.Model):
             return None
 
         facture = FactureTravaux.objects.create(
-            numero_facture=f"FAC-{self.numero_commande}",
+            numero_facture=f"FAC- {self.numero_commande}",
             client=self.client,
             date_emission=self.derniere_mise_a_jour.date(),
             statut="draft",
@@ -1563,6 +1564,13 @@ class Cd(models.Model):
         ("invoiced", "Facturée"),
     ]
 
+    FACTURE_TYPES = (
+        ('facture', 'Facture'),
+        ('avoir', 'Avoir'),
+    )
+    
+    nature = models.CharField(max_length=10, choices=FACTURE_TYPES, default='facture')
+
     numero_commande = models.CharField(
         max_length=50, unique=True, help_text="Order number"
     )
@@ -1689,7 +1697,7 @@ class Cd(models.Model):
     def save(self, *args, **kwargs):
         # Auto-generate numero_commande if not provided
         if not self.numero_commande:
-            self.numero_commande = self._generate_numero_commande(self.type_facture)
+            self.numero_commande = self._generate_numero_commande(self.type_facture, self.nature)
 
         is_new = self.pk is None
         if is_new and (self.montant_ht is None):
@@ -1714,12 +1722,15 @@ class Cd(models.Model):
                     ]
                 )
 
-    def _generate_numero_commande(self, type_facture):
+    def _generate_numero_commande(self, type_facture, nature):
         """Generate next sequential order number for current year (never reuses numbers)"""
         from datetime import datetime
         current_year = datetime.now().year
-        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
-
+        if nature == "facture":
+            prefix_type = "FAC-BL" if type_facture == "bon" else "FAC"
+        else:
+            prefix_type = "AV-BL" if type_facture == "bon" else "AV"
+        prefix = f"{prefix_type}-{current_year}-"
         # Find the highest existing number for current year
         existing_commandes = Cd.objects.filter(
             numero_commande__startswith=prefix
@@ -1744,7 +1755,7 @@ class Cd(models.Model):
         if self.statut != "completed" or self.facture is not None:
             return None
 
-        # Create invoice
+        # Create invoice.
         facture = FactureTravaux.objects.create(
             numero_facture=f"FAC-{self.numero_commande}",
             client=self.client,

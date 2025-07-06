@@ -19,8 +19,17 @@ class CdViewSet(viewsets.ModelViewSet):
     API endpoint for managing orders (commande)
     """
 
-    queryset = Cd.objects.all().order_by("-date_commande", "-numero_commande")
+    queryset = Cd.objects.all()  # required by DRF router
 
+    def get_queryset(self):
+        nature = self.request.query_params.get("nature")
+        qs = Cd.objects.all().order_by("-date_commande", "-numero_commande")
+        
+        if nature:
+            qs = qs.filter(nature=nature)
+        
+        return qs
+    
     def get_serializer_class(self):
         if self.action == "list":
             return CdListSerializer

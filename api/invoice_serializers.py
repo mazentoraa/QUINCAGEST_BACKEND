@@ -78,6 +78,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         model = FactureTravaux
         fields = (
             "id",
+            "nature", # Facture ou avoir
             "numero_facture",
             "client",  # Add client field to write data
             "client_details",
