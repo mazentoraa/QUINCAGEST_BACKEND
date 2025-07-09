@@ -3,6 +3,7 @@ from .models import Client, Traveaux, Produit, Matiere, MatiereUsage, Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 from .models import MatierePremiereAchat
+from decimal import Decimal
 
 class MatiereSerializer(serializers.ModelSerializer):
     client_id = serializers.PrimaryKeyRelatedField(
@@ -103,11 +104,19 @@ class ClientSerializer(serializers.ModelSerializer):
 
 
 class MatiereUsageSerializer(serializers.ModelSerializer):
-    matiere_id = serializers.IntegerField()
+    matiere_id = serializers.IntegerField(write_only=True) # To acccept
+    material_id = serializers.SerializerMethodField(read_only=True) # to return
 
     class Meta:
         model = MatiereUsage
-        fields = ("matiere_id", "quantite_utilisee")
+        fields = ("matiere_id", "material_id", "quantite_utilisee", "source")
+
+    def get_material_id(self, obj):
+        if obj.source == "client" and obj.matiere:
+            return obj.matiere.id
+        elif obj.source == "stock" and obj.achat:
+            return obj.achat.id
+        return None
 
 
 class TraveauxSerializer(serializers.ModelSerializer):
@@ -162,50 +171,10 @@ class TraveauxSerializer(serializers.ModelSerializer):
         # Process material usage
         for matiere_usage_data in matiere_usages_data:
             matiere_id = matiere_usage_data.get("matiere_id")
-            quantite_utilisee = matiere_usage_data.get("quantite_utilisee")
+            quantite_utilisee = Decimal(matiere_usage_data.get("quantite_utilisee"))
+            source = matiere_usage_data.get("source", "stock")  # Default to main stock
 
-            try:
-                matiere = Matiere.objects.get(pk=matiere_id)
-
-                # Check if we have enough quantity
-                if matiere.remaining_quantity < quantite_utilisee:
-                    raise serializers.ValidationError(
-                        f"Not enough material available. Only {matiere.remaining_quantity} units of {matiere.type_matiere} remaining."
-                    )
-
-                # Create the usage record
-                MatiereUsage.objects.create(
-                    travaux=travaux,
-                    matiere=matiere,
-                    quantite_utilisee=quantite_utilisee,
-                )
-
-                # Update the remaining quantity
-                matiere.remaining_quantity -= quantite_utilisee
-                matiere.save()
-
-            except Matiere.DoesNotExist:
-                raise serializers.ValidationError(
-                    f"Material with ID {matiere_id} not found"
-                )
-
-        return travaux
-
-    def update(self, instance, validated_data):
-        if "matiere_usages" in validated_data:
-            matiere_usages_data = validated_data.pop("matiere_usages")
-
-            # Reset quantities for existing usages first
-            for usage in instance.matiere_usages.all():
-                matiere = usage.matiere
-                matiere.remaining_quantity += usage.quantite_utilisee
-                matiere.save()
-                usage.delete()
-
-            # Add new usages
-            for matiere_usage_data in matiere_usages_data:
-                matiere_id = matiere_usage_data.get("matiere_id")
-                quantite_utilisee = matiere_usage_data.get("quantite_utilisee")
+            if source == "client":
                 try:
                     matiere = Matiere.objects.get(pk=matiere_id)
 
@@ -217,9 +186,10 @@ class TraveauxSerializer(serializers.ModelSerializer):
 
                     # Create the usage record
                     MatiereUsage.objects.create(
-                        travaux=instance,
+                        travaux=travaux,
                         matiere=matiere,
                         quantite_utilisee=quantite_utilisee,
+                        source=source
                     )
 
                     # Update the remaining quantity
@@ -230,6 +200,91 @@ class TraveauxSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         f"Material with ID {matiere_id} not found"
                     )
+            elif source == "stock":
+                try:
+                    achat = MatierePremiereAchat.objects.get(pk=matiere_id)
+                    if achat.remaining_quantity < quantite_utilisee:
+                        raise serializers.ValidationError(
+                            f"Not enough stock: {achat.remaining_quantity} remaining for {achat.nom_matiere}"
+                        )
+                    achat.remaining_quantity -= quantite_utilisee
+                    achat.save()
+
+                    MatiereUsage.objects.create(
+                        travaux=travaux,
+                        quantite_utilisee=quantite_utilisee,
+                        source=source,
+                        achat_id=achat.id 
+                    )
+
+                except MatierePremiereAchat.DoesNotExist:
+                    raise serializers.ValidationError(f"Stock material with ID {matiere_id} not found")
+
+        return travaux
+    
+    def update(self, instance, validated_data):
+        if "matiere_usages" in validated_data:
+            matiere_usages_data = validated_data.pop("matiere_usages")
+
+            # Reset quantities for existing usages first
+            for usage in instance.matiere_usages.all():
+                if usage.source == "client" and usage.matiere:
+                    usage.matiere.remaining_quantity += usage.quantite_utilisee
+                    usage.matiere.save()
+                elif usage.source == "stock" and usage.achat:
+                    usage.achat.remaining_quantity += usage.quantite_utilisee
+                    usage.achat.save()
+                usage.delete()
+
+            # Re-add new usages
+            for usage_data in matiere_usages_data:
+                source = usage_data.get("source", "stock")
+                matiere_id = usage_data.get("matiere_id")
+                quantite_utilisee = usage_data.get("quantite_utilisee")
+
+                if source == "client":
+                    try:
+                        matiere = Matiere.objects.get(pk=matiere_id)
+                        if matiere.remaining_quantity < quantite_utilisee:
+                            raise serializers.ValidationError(
+                                f"Not enough client material. Only {matiere.remaining_quantity} units left of {matiere.type_matiere}."
+                            )
+
+                        MatiereUsage.objects.create(
+                            travaux=instance,
+                            matiere=matiere,
+                            quantite_utilisee=quantite_utilisee,
+                            source=source,
+                        )
+
+                        matiere.remaining_quantity -= quantite_utilisee
+                        matiere.save()
+                    except Matiere.DoesNotExist:
+                        raise serializers.ValidationError(
+                            f"Client material with ID {matiere_id} not found."
+                        )
+
+                elif source == "stock":
+                    try:
+                        achat = MatierePremiereAchat.objects.get(pk=matiere_id)
+                        if achat.remaining_quantity < quantite_utilisee:
+                            raise serializers.ValidationError(
+                                f"Not enough stock material. Only {achat.remaining_quantity} units left of {achat.nom_matiere}."
+                            )
+
+                        MatiereUsage.objects.create(
+                            travaux=instance,
+                            achat=achat,
+                            quantite_utilisee=quantite_utilisee,
+                            source=source,
+                        )
+
+                        achat.remaining_quantity -= quantite_utilisee
+                        achat.save()
+                    except MatierePremiereAchat.DoesNotExist:
+                        raise serializers.ValidationError(
+                            f"Stock material with ID {matiere_id} not found."
+                        )
 
         return super().update(instance, validated_data)
 
