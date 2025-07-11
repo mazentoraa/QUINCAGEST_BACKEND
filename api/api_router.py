@@ -32,8 +32,15 @@ from .views import FactureAchatMatiereViewSet
 from .views import BonLivraisonMatiereViewSet
 from .views import FournisseurViewSet
 from .views import ConsommableViewSet
+from .views import (
+    BonRetourFournisseurViewSet,
+    fournisseur_available_materials,
+    validate_return_quantities_fournisseur,
+    BonRetourFournisseurByFournisseurView,
+    BonRetourFournisseurStatsView,
+)
 
-
+from .views import PlanTraiteFournisseurViewSet, TraiteFournisseurViewSet
 
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
@@ -59,6 +66,11 @@ router.register(r"factures-achat-matieres", FactureAchatMatiereViewSet, basename
 router.register(r'bon-livraison-matieres', BonLivraisonMatiereViewSet, basename='bonlivraisonmatiere')
 router.register(r'fournisseurs', FournisseurViewSet, basename='fournisseur')
 router.register(r'consommables', ConsommableViewSet)
+router.register(r"bons-retour-fournisseurs", BonRetourFournisseurViewSet, basename="bon-retour-fournisseur")
+router.register(r"plans-traite-fournisseur", PlanTraiteFournisseurViewSet, basename="plan-traite-fournisseur")
+router.register(r"traites-fournisseur", TraiteFournisseurViewSet, basename="traite-fournisseur")
+
+
 
 
 urlpatterns = [
@@ -118,6 +130,28 @@ urlpatterns = [
         dashboard_views.main_dashboard_insights,
         name="dashboard-main-insights",
     ),
+    # BonRetourFournisseur specific endpoints
+path(
+    "api/fournisseurs/<int:fournisseur_id>/available-materials/",
+    fournisseur_available_materials,
+    name="fournisseur-available-materials",
+),
+path(
+    "api/bons-retour-fournisseurs/validate-quantities/",
+    validate_return_quantities_fournisseur,
+    name="validate-return-quantities-fournisseur",
+),
+path(
+    "api/fournisseurs/<int:fournisseur_id>/bons-retour-fournisseurs/",
+    BonRetourFournisseurByFournisseurView.as_view(),
+    name="fournisseur-bons-retour",
+),
+path(
+    "api/bons-retour-fournisseurs/stats/",
+    BonRetourFournisseurStatsView.as_view(),
+    name="bons-retour-fournisseur-stats",
+),
+
 ]
 
 app_name = "api"
