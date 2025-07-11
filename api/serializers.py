@@ -314,7 +314,7 @@ class FactureAchatMatiereSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FactureAchatMatiere
-        fields = ['id', 'numero', 'fournisseur', 'type_achat', 'prix_total', 'date_facture', 'achats']
+        fields = ['id', 'numero', 'fournisseur', 'type_achat','mode_paiement', 'prix_total', 'date_facture', 'achats']
 
     def create(self, validated_data):
         achats_data = validated_data.pop('achats', [])
@@ -396,3 +396,277 @@ class ConsommableSerializer(serializers.ModelSerializer):
     class Meta:
         model = Consommable
         fields = '__all__'
+
+
+from rest_framework import serializers
+from .models import BonRetourFournisseur, MatiereRetourFournisseur, Matiere, Fournisseur
+
+
+class MatiereForRetourFournisseurSerializer(serializers.ModelSerializer):
+    """Serializer for materials available for return to fournisseur"""
+
+    nom_matiere = serializers.CharField()
+    quantite_retournee = serializers.IntegerField(min_value=1)
+
+    class Meta:
+        model = Matiere
+        fields = [
+            "nom_matiere",
+            "quantite_retournee",
+        ]
+        read_only_fields = [
+            "id",
+            "type_matiere",
+            "description",
+            "thickness",
+            "length",
+            "width",
+            "surface",
+            "remaining_quantity",
+        ]
+
+    def validate_quantite_retournee(self, value):
+        if hasattr(self, "instance") and self.instance:
+            if value > self.instance.remaining_quantity:
+                raise serializers.ValidationError(
+                    f"Cannot return {value} units. Only {self.instance.remaining_quantity} remaining."
+                )
+        return value
+
+
+class MatiereRetourFournisseurFreeSerializer(serializers.Serializer):
+    nom_matiere = serializers.CharField()
+    quantite_retournee = serializers.IntegerField(min_value=1)
+
+    class Meta:
+        model = MatiereRetourFournisseur
+        fields = ["id", "matiere_id", "matiere_details", "quantite_retournee"]
+
+    def validate_matiere_id(self, value):
+        try:
+            matiere = Matiere.objects.get(id=value)
+            return value
+        except Matiere.DoesNotExist:
+            raise serializers.ValidationError("Material not found.")
+
+    def validate(self, attrs):
+        matiere_id = attrs.get("matiere_id")
+        quantite_retournee = attrs.get("quantite_retournee", 1)
+
+        if matiere_id:
+            try:
+                matiere = Matiere.objects.get(id=matiere_id)
+                if quantite_retournee > matiere.remaining_quantity:
+                    raise serializers.ValidationError({
+                        "quantite_retournee": f"Cannot return {quantite_retournee} units. Only {matiere.remaining_quantity} remaining."
+                    })
+            except Matiere.DoesNotExist:
+                raise serializers.ValidationError({"matiere_id": "Material not found."})
+        return attrs
+
+
+class FournisseurBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Fournisseur
+        fields = ["id", "nom", "adresse"]
+
+
+class BonRetourFournisseurSerializer(serializers.ModelSerializer):
+    fournisseur_details = FournisseurBasicSerializer(source="fournisseur", read_only=True)
+    matiere_retours = MatiereRetourFournisseurFreeSerializer(many=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = BonRetourFournisseur
+        fields = [
+            "id",
+            "numero_bon",
+            "fournisseur",
+            "fournisseur_details",
+            "status",
+            "status_display",
+            "date_reception",
+            "date_retour",
+            "date_emission",
+            "notes",
+            "date_creation",
+            "derniere_mise_a_jour",
+            "matiere_retours",
+        ]
+        read_only_fields = [
+            "id",
+            "date_creation",
+            "derniere_mise_a_jour",
+            "date_emission",
+        ]
+
+    def create(self, validated_data):
+        matieres_data = validated_data.pop("matiere_retours", [])
+        bon_retour = BonRetourFournisseur.objects.create(**validated_data)
+
+        for mat_data in matieres_data:
+            MatiereRetourFournisseur.objects.create(
+                bon_retour=bon_retour,
+                nom_matiere=mat_data["nom_matiere"],
+                quantite_retournee=mat_data["quantite_retournee"],
+            )
+        return bon_retour
+
+    def update(self, instance, validated_data):
+        matiere_retours_data = validated_data.pop("matiere_retours", [])
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if matiere_retours_data is not None:
+            instance.matiere_retours.all().delete()
+            for mat_data in matiere_retours_data:
+                MatiereRetourFournisseur.objects.create(bon_retour=instance, **mat_data)
+
+        return instance
+
+
+class BonRetourFournisseurListSerializer(serializers.ModelSerializer):
+    fournisseur_name = serializers.CharField(source="fournisseur.nom", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    total_materials = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BonRetourFournisseur
+        fields = [
+            "id",
+            "numero_bon",
+            "fournisseur_name",
+            "status",
+            "status_display",
+            "date_reception",
+            "date_retour",
+            "total_materials",
+        ]
+
+    def get_total_materials(self, obj):
+        return obj.matiere_retours.count()
+
+
+class FournisseurMaterialsSerializer(serializers.ModelSerializer):
+    available_materials = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Fournisseur
+        fields = ["id", "nom", "numero_fiscal", "available_materials"]
+
+    def get_available_materials(self, obj):
+        # Ici tu dois récupérer les matières saisies, par exemple via un filtre personnalisé
+        # Si tu n'as pas de relation directe, adapte cette partie
+        # Ex: récupère toutes les MatiereRetourFournisseur des bons du fournisseur avec quantité > 0
+        bons = BonRetourFournisseur.objects.filter(fournisseur=obj, is_deleted=False)
+        matieres = MatiereRetourFournisseur.objects.filter(bon_retour__in=bons, is_deleted=False)
+        # On retourne un format simplifié, par exemple nom_matiere et quantite max dispo (ou autre logique)
+        # Ici on peut juste retourner toutes les matières retournées (sans déduplication)
+        data = []
+        for m in matieres:
+            data.append({
+                "nom_matiere": m.nom_matiere,
+                "quantite_retournee": m.quantite_retournee,
+            })
+        return data
+
+
+
+from rest_framework import serializers
+from .models import PlanTraiteFournisseur, TraiteFournisseur, FactureAchatMatiere, Fournisseur
+
+
+class TraiteFournisseurSerializer(serializers.ModelSerializer):
+    numero_facture = serializers.CharField(source='plan_traite.numero_facture', read_only=True)
+    fournisseur_nom = serializers.CharField(source='plan_traite.nom_raison_sociale', read_only=True)
+
+    class Meta:
+        model = TraiteFournisseur
+        fields = '__all__'
+        extra_fields = ('numero_facture', 'fournisseur_nom')
+
+    def get_fields(self):
+        fields = super().get_fields()
+        for field_name in getattr(self.Meta, 'extra_fields', []):
+            fields[field_name] = serializers.ReadOnlyField()
+        return fields
+
+
+class PlanTraiteFournisseurSerializer(serializers.ModelSerializer):
+    fournisseur = FournisseurSerializer(read_only=True)
+    traites = TraiteFournisseurSerializer(many=True, read_only=True)
+    facture_numero = serializers.CharField(source='numero_facture', read_only=True)
+    fournisseur_nom = serializers.CharField(source='nom_raison_sociale', read_only=True)
+    bank_name = serializers.CharField(read_only=True)
+    bank_address = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = PlanTraiteFournisseur
+        fields = '__all__'
+
+
+class CreatePlanTraiteFournisseurSerializer(serializers.Serializer):
+    numero_facture = serializers.CharField(required=True)
+    nombre_traite = serializers.IntegerField(min_value=1, max_value=24, required=True)
+    date_premier_echeance = serializers.DateField(required=True)
+    periode = serializers.IntegerField(min_value=1, required=False, default=30)
+    montant_total = serializers.FloatField(required=False, allow_null=True)
+    rip = serializers.CharField(required=False, allow_blank=True)
+    acceptance = serializers.CharField(required=False, allow_blank=True)
+    notice = serializers.CharField(required=False, allow_blank=True)
+    bank_name = serializers.CharField(required=False, allow_blank=True)
+    bank_address = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_numero_facture(self, value):
+        if not FactureAchatMatiere.objects.filter(numero=value).exists():
+            raise serializers.ValidationError("La facture spécifiée n'existe pas.")
+        return value
+
+    def create(self, validated_data):
+        facture = FactureAchatMatiere.objects.get(numero=validated_data["numero_facture"])
+        fournisseur = facture.fournisseur
+
+
+        plan = PlanTraiteFournisseur.objects.create(
+            facture=facture,
+            fournisseur=fournisseur,
+            numero_facture=facture.numero,
+            nom_raison_sociale=facture.fournisseur,
+            matricule_fiscal=getattr(fournisseur, "matricule_fiscal", "") if fournisseur else "",
+            nombre_traite=validated_data["nombre_traite"],
+            date_premier_echeance=validated_data["date_premier_echeance"],
+            periode=validated_data.get("periode", 30),
+            montant_total=validated_data.get("montant_total"),
+            rip=validated_data.get("rip", ""),
+            acceptance=validated_data.get("acceptance", ""),
+            notice=validated_data.get("notice", ""),
+            bank_name=validated_data.get("bank_name", ""),
+            bank_address=validated_data.get("bank_address", ""),
+        )
+
+        return plan
+
+
+class UpdateTraiteFournisseurStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=['PAYEE', 'NON_PAYEE'])
+
+    def validate_status(self, value):
+        return value.upper()
+
+
+class UpdatePlanFournisseurStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=['PAYEE', 'NON_PAYEE', 'PARTIELLEMENT_PAYEE'])
+
+    def validate_status(self, value):
+        return value.upper()
+
+
+class SoftDeletePlanTraiteFournisseurSerializer(serializers.Serializer):
+    is_deleted = serializers.BooleanField(default=True)
+
+    def validate_is_deleted(self, value):
+        if not isinstance(value, bool):
+            raise serializers.ValidationError("Ce champ doit être un booléen.")
+        return value
