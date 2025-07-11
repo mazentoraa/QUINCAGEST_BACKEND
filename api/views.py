@@ -88,7 +88,7 @@ class TraveauxViewSet(viewsets.ModelViewSet):
     """
 
     permission_classes = [IsAdminUser]
-    queryset = Traveaux.objects.all().order_by("date_creation")
+    queryset = Traveaux.objects.all().order_by("-date_creation")
     serializer_class = TraveauxSerializer
 
     def get_queryset(self):
@@ -98,17 +98,21 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         return self.queryset.prefetch_related("matiere_usages__matiere")
 
     @transaction.atomic
-    def perform_destroy(self, instance):
-        """
-        Override to restore material quantities when a work is deleted
-        """
-        # Restore material quantities
-        for usage in instance.matiere_usages.all():
-            matiere = usage.matiere
-            matiere.remaining_quantity += usage.quantite_utilisee
-            matiere.save()
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
 
+        # Restore materials before deleting
+        for usage in instance.matiere_usages.all():
+            if usage.source == "client" and usage.matiere:
+                usage.matiere.remaining_quantity += usage.quantite_utilisee
+                usage.matiere.save()
+            elif usage.source == "stock" and usage.achat:
+                usage.achat.remaining_quantity += usage.quantite_utilisee
+                usage.achat.save()
+
+        # Delete the work
         instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_create(self, serializer):
         print("📥 Request data:", self.request.data)

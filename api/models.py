@@ -290,7 +290,82 @@ class Produit(models.Model):
         return self.nom_produit
 
 
+class MatierePremiereAchat(models.Model):
+    ref = models.CharField(max_length=100, unique=True)
+    nom_matiere = models.CharField(max_length=200)
+
+    categorie = models.CharField(
+        max_length=100,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("metaux","Metaux"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+    )
+
+    description = models.TextField(blank=True, null=True)
+    unite_mesure = models.CharField(
+        max_length=10,
+        choices=[
+            ("kg", "Kilogramme"),
+            ("pcs", "Pièce"),
+            ("m2", "Mètre carré"),
+            ("m3", "Mètre cube"),
+        ],
+        default="kg"
+    )
+
+    longueur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
+    )
+    largeur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
+    )
+    epaisseur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
+    )
+    surface = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
+    )
+
+    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    emplacement = models.CharField(max_length=200, blank=True, null=True)
+
+    fournisseur_principal = models.CharField(max_length=200)
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
+    date_reception = models.DateField()
+    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.ref} - {self.nom_matiere}"
+    
+
+    # A supprimer
+    # def update_quantity_after_usage(self, used_quantity):
+    #     if self.remaining_quantity < used_quantity:
+    #         return False
+    #     self.remaining_quantity -= used_quantity
+    #     self.save()
+    #     return True
+
+
 class MatiereUsage(models.Model):
+    SOURCE_CHOICES = [
+        ("stock", "Main Stock"),
+        ("client", "Client Provided"),
+    ]
+
+    achat = models.ForeignKey(MatierePremiereAchat, null=True, blank=True, on_delete=models.SET_NULL)
+    
     travaux = models.ForeignKey(
         "Traveaux",
         on_delete=models.CASCADE,
@@ -298,35 +373,40 @@ class MatiereUsage(models.Model):
         help_text="Work",
     )
     matiere = models.ForeignKey(
-        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material"
+        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material", null=True, blank=True
     )
     quantite_utilisee = models.PositiveIntegerField(
         default=1, help_text="Quantity used in the work"
     )
+    source = models.CharField(null=True, choices=SOURCE_CHOICES, help_text="Material usage source, stock or client")
     is_deleted = models.BooleanField(default=False, help_text="Material usage deleted")
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the material usage was deleted"
     )
 
-    class Meta:
-        unique_together = ("travaux", "matiere")
+    # class Meta:
+        # unique_together = ("travaux", "matiere")
 
     def __str__(self):
-        return f"{self.matiere} - {self.quantite_utilisee} units for {self.travaux}"
+        name = self.matiere or self.achat
+        return f"{name} - {self.quantite_utilisee} units for {self.travaux}"
 
-    def save(self, *args, **kwargs):
-        # Check if this is a new instance being created
-        if not self.pk:
-            # Update material quantity
-            success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
-            if not success:
-                from django.core.exceptions import ValidationError
+    # def save(self, *args, **kwargs):
+    #     # Check if this is a new instance being created
+    #     if not self.pk:
+    #         # Update material quantity
+    #         if self.source == "client" and self.matiere:
+    #             success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
+    #         elif self.source == "stock" and self.achat:
+    #             success = self.achat.update_quantity_after_usage(self.quantite_utilisee)
+    #         if not success:
+    #             from django.core.exceptions import ValidationError
 
-                raise ValidationError(
-                    f"Insufficient quantity available for {self.matiere}. "
-                    f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
-                )
-        super().save(*args, **kwargs)
+    #             raise ValidationError(
+    #                 f"Insufficient quantity available for {self.matiere}. "
+    #                 f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
+    #             )
+    #     super().save(*args, **kwargs)
 
 
 class Traveaux(models.Model):
@@ -1878,68 +1958,6 @@ class MatierePurchase(models.Model):
     #     if not self.pk or self.remaining_quantity == 0:
     #         self.remaining_quantity = self.quantite
     #     super().save(*args, **kwargs)
-
-   
-
-
-class MatierePremiereAchat(models.Model):
-    ref = models.CharField(max_length=100, unique=True)
-    nom_matiere = models.CharField(max_length=200)
-
-    categorie = models.CharField(
-        max_length=100,
-        choices=[
-            ("acier", "Acier"),
-            ("acier_inoxydable", "Acier inoxydable"),
-            ("aluminium", "Aluminium"),
-            ("laiton", "Laiton"),
-            ("cuivre", "Cuivre"),
-            ("acier_galvanise", "Acier galvanisé"),
-            ("metaux","Metaux"),
-            ("autre", "Autre"),
-        ],
-        default="autre",
-    )
-
-    description = models.TextField(blank=True, null=True)
-    unite_mesure = models.CharField(
-        max_length=10,
-        choices=[
-            ("kg", "Kilogramme"),
-            ("pcs", "Pièce"),
-            ("m2", "Mètre carré"),
-            ("m3", "Mètre cube"),
-        ],
-        default="kg"
-    )
-
-    longueur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
-    )
-    largeur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
-    )
-    epaisseur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
-    )
-    surface = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
-    )
-
-    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    emplacement = models.CharField(max_length=200, blank=True, null=True)
-
-    fournisseur_principal = models.CharField(max_length=200)
-    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
-    date_reception = models.DateField()
-    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.ref} - {self.nom_matiere}"
-
 
 class FactureAchatMatiere(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
