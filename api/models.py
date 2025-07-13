@@ -2208,3 +2208,117 @@ class TraiteFournisseur(models.Model):
             models.Index(fields=["date_echeance"]),
             models.Index(fields=["status"]),
         ]
+
+
+from django.db import models
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+from django.db import models
+
+class Employe(models.Model):
+    id_employe = models.CharField(max_length=100, unique=True)
+    nom = models.CharField(max_length=255)
+    cin = models.CharField(max_length=50, blank=True, null=True)
+    telephone = models.CharField(max_length=50, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    date_naissance = models.DateField(blank=True, null=True)
+    adresse = models.TextField(blank=True, null=True)
+
+    # ✅ Nouveaux champs
+    numero_cnss = models.CharField(max_length=50, blank=True, null=True)
+    situation_familiale = models.CharField(max_length=50, blank=True, null=True)
+    enfants_a_charge = models.IntegerField(blank=True, null=True)
+    nombre_enfants = models.IntegerField(blank=True, null=True)
+    categorie = models.CharField(max_length=50, blank=True, null=True)
+
+    # Infos pro
+    poste = models.CharField(max_length=100, blank=True, null=True)
+    departement = models.CharField(max_length=100, blank=True, null=True)
+    date_embauche = models.DateField(blank=True, null=True)
+    statut = models.CharField(max_length=50, blank=True, null=True)
+    code_contrat = models.CharField(max_length=50, blank=True, null=True)
+    type_contrat = models.CharField(max_length=50, blank=True, null=True)
+    responsable = models.CharField(max_length=255, blank=True, null=True)
+    salaire = models.FloatField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nom
+
+class Avance(models.Model):
+    STATUT_CHOICES = (
+        ('En attente', 'En attente'),
+        ('Acceptée', 'Acceptée'),
+        ('Refusée', 'Refusée'),
+    )
+
+    employee = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='avances')
+    montant = models.FloatField()
+    date_demande = models.DateField(default=timezone.now)
+    motif = models.TextField()
+    nbr_mensualite = models.IntegerField()
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='En attente')
+
+    def mensualite(self):
+        if self.nbr_mensualite:
+            return round(self.montant / self.nbr_mensualite, 2)
+        return 0
+
+    def progression(self):
+        if self.statut != 'Acceptée':
+            return 0
+        rembourse = Remboursement.objects.filter(avance=self).aggregate(total=models.Sum('montant'))['total'] or 0
+        return min(100, round((rembourse / self.montant) * 100, 1)) if self.montant else 0
+
+    def reste(self):
+        rembourse = Remboursement.objects.filter(avance=self).aggregate(total=models.Sum('montant'))['total'] or 0
+        return round(self.montant - rembourse, 2)
+
+    def __str__(self):
+        return f"Avance - {self.employee} - {self.montant} DH"
+        
+
+class Remboursement(models.Model):
+    avance = models.ForeignKey(Avance, on_delete=models.CASCADE, related_name='remboursements')
+    date = models.DateField(default=timezone.now)
+    montant = models.FloatField()
+
+
+class FichePaie(models.Model):
+    employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='fiches_paie')
+    mois = models.IntegerField()
+    annee = models.IntegerField()
+    salaire_base = models.FloatField()
+    prime_anciennete = models.FloatField(default=0)
+    indemnite_presence = models.FloatField(default=0)
+    indemnite_transport = models.FloatField(default=0)
+    prime_langue = models.FloatField(default=0)
+    jours_feries_payes = models.FloatField(default=0)
+    absences_non_remunerees = models.FloatField(default=0)
+    prime_ramadan = models.FloatField(default=0)
+    prime_teletravail = models.FloatField(default=0)
+    avantage_assurance = models.FloatField(default=0)
+    conge_precedent = models.FloatField(default=0)
+    conge_acquis = models.FloatField(default=0)
+    conge_pris = models.FloatField(default=0)
+    conge_restant = models.FloatField(default=0)
+    conge_speciaux = models.FloatField(default=0)
+    conge_maladie_m = models.FloatField(default=0)
+    conge_maladie_a = models.FloatField(default=0)
+    banque = models.CharField(max_length=100, null=True, blank=True)
+    rib = models.CharField(max_length=100, null=True, blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    statut = models.CharField(max_length=50, default='Générée')
+
+    # Calculs (déjà calculés en front, mais prévues ici pour cohérence)
+    salaire_brut = models.FloatField(default=0)
+    salaire_imposable = models.FloatField(default=0)
+    cnss_salarie = models.FloatField(default=0)
+    irpp = models.FloatField(default=0)
+    css = models.FloatField(default=0)
+    deduction_totale = models.FloatField(default=0)
+    cnss_patronal = models.FloatField(default=0)
+    accident_travail = models.FloatField(default=0)
+    charges_patronales = models.FloatField(default=0)
+    net_a_payer = models.FloatField(default=0)

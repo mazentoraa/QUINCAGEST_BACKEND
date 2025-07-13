@@ -849,3 +849,69 @@ class TraiteFournisseurViewSet(viewsets.ModelViewSet):
         plan.save()
 
         return Response(TraiteFournisseurSerializer(traite).data, status=200)
+
+
+
+from rest_framework import viewsets
+from .models import Employe
+from .serializers import EmployeSerializer
+
+class EmployeViewSet(viewsets.ModelViewSet):
+    queryset = Employe.objects.all().order_by('-created_at')
+    serializer_class = EmployeSerializer
+
+
+# views.py
+
+from rest_framework import viewsets, status
+from rest_framework.response import Response
+from rest_framework.decorators import action
+from django.db.models import Sum, Count
+from .models import Avance, Remboursement
+from .serializers import AvanceSerializer, RemboursementSerializer
+
+class AvanceViewSet(viewsets.ModelViewSet):
+    queryset = Avance.objects.all().order_by('-date_demande')
+    serializer_class = AvanceSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search')
+        statut = self.request.query_params.get('statut')
+
+        if search:
+            queryset = queryset.filter(employee__nom__icontains=search)
+        if statut:
+            queryset = queryset.filter(statut=statut)
+
+        return queryset
+
+    @action(detail=True, methods=['patch'])
+    def update_status(self, request, pk=None):
+        avance = self.get_object()
+        new_statut = request.data.get('statut')
+        if new_statut not in dict(Avance.STATUT_CHOICES):
+            return Response({'error': 'Statut invalide'}, status=400)
+        avance.statut = new_statut
+        avance.save()
+        return Response(self.get_serializer(avance).data)
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        data = {
+            "avances_actives": Avance.objects.filter(statut='Acceptée').count(),
+            "avances_pending": Avance.objects.filter(statut='En attente').count(),
+            "total_avances": Avance.objects.count(),
+            "total_montant": Avance.objects.aggregate(total=Sum('montant'))['total'] or 0,
+            "total_rembourse": Remboursement.objects.aggregate(total=Sum('montant'))['total'] or 0,
+        }
+        data['total_reste'] = round(data['total_montant'] - data['total_rembourse'], 2)
+        return Response(data)
+
+
+from rest_framework import viewsets
+from .models import Employe, FichePaie
+from .serializers import EmployeSerializer, FichePaieSerializer
+class FichePaieViewSet(viewsets.ModelViewSet):
+    queryset = FichePaie.objects.all()
+    serializer_class = FichePaieSerializer
