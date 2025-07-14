@@ -41,7 +41,8 @@ from .views import (
 )
 
 from .views import PlanTraiteFournisseurViewSet, TraiteFournisseurViewSet
-
+from .views import EmployeViewSet
+from .views import AvanceViewSet,FichePaieViewSet
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
 router.register(r"traveaux", TraveauxViewSet)
@@ -69,6 +70,9 @@ router.register(r'consommables', ConsommableViewSet)
 router.register(r"bons-retour-fournisseurs", BonRetourFournisseurViewSet, basename="bon-retour-fournisseur")
 router.register(r"plans-traite-fournisseur", PlanTraiteFournisseurViewSet, basename="plan-traite-fournisseur")
 router.register(r"traites-fournisseur", TraiteFournisseurViewSet, basename="traite-fournisseur")
+router.register(r'employes', EmployeViewSet)
+router.register(r'avances', AvanceViewSet, basename='avance')
+router.register(r'fiches-paie', FichePaieViewSet)
 
 urlpatterns = [
     path("api/", include(router.urls)),

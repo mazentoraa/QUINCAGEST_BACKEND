@@ -16,6 +16,7 @@ from .models import (
     ProduitDevis,
     Commande,
     ProduitCommande,
+    Employe,
 )
 
 # Register your models here.
@@ -35,3 +36,5 @@ admin.site.register(Devis)
 admin.site.register(ProduitDevis)
 admin.site.register(Commande)
 admin.site.register(ProduitCommande)
+admin.site.register(Employe)
+
