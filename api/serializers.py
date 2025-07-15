@@ -672,10 +672,17 @@ class SoftDeletePlanTraiteFournisseurSerializer(serializers.Serializer):
         return value
 
 
+
 from rest_framework import serializers
-from .models import Employe
+from .models import Employe, Avance, Remboursement, FichePaie
+
+class FichePaieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FichePaie
+        fields = '__all__'
 
 class EmployeSerializer(serializers.ModelSerializer):
+    fiches_paie = FichePaieSerializer(many=True, read_only=True)
     
     class Meta:
         model = Employe
@@ -713,9 +720,8 @@ class RemboursementSerializer(serializers.ModelSerializer):
 
 
 from .models import Employe, FichePaie
-
-class FichePaieSerializer(serializers.ModelSerializer):
-    employee = EmployeSerializer(source='employe', read_only=True) 
+class FichePaieDetailSerializer(serializers.ModelSerializer):
+    employe = EmployeSerializer(read_only=True)
 
     class Meta:
         model = FichePaie
