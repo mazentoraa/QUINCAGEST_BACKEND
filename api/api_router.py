@@ -132,27 +132,27 @@ urlpatterns = [
         name="dashboard-main-insights",
     ),
     # BonRetourFournisseur specific endpoints
-path(
-    "api/fournisseurs/<int:fournisseur_id>/available-materials/",
-    fournisseur_available_materials,
-    name="fournisseur-available-materials",
-),
-path(
-    "api/bons-retour-fournisseurs/validate-quantities/",
-    validate_return_quantities_fournisseur,
-    name="validate-return-quantities-fournisseur",
-),
-path(
-    "api/fournisseurs/<int:fournisseur_id>/bons-retour-fournisseurs/",
-    BonRetourFournisseurByFournisseurView.as_view(),
-    name="fournisseur-bons-retour",
-),
-path(
-    "api/bons-retour-fournisseurs/stats/",
-    BonRetourFournisseurStatsView.as_view(),
-    name="bons-retour-fournisseur-stats",
-),
-
+    path(
+        "api/fournisseurs/<int:fournisseur_id>/available-materials/",
+        fournisseur_available_materials,
+        name="fournisseur-available-materials",
+    ),
+    path(
+        "api/bons-retour-fournisseurs/validate-quantities/",
+        validate_return_quantities_fournisseur,
+        name="validate-return-quantities-fournisseur",
+    ),
+    path(
+        "api/fournisseurs/<int:fournisseur_id>/bons-retour-fournisseurs/",
+        BonRetourFournisseurByFournisseurView.as_view(),
+        name="fournisseur-bons-retour",
+    ),
+    path(
+        "api/bons-retour-fournisseurs/stats/",
+        BonRetourFournisseurStatsView.as_view(),
+        name="bons-retour-fournisseur-stats",
+    ),
+    path("tresorerie/", include("tresorerie.urls")),
 ]
 
 app_name = "api"

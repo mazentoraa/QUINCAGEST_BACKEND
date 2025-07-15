@@ -347,16 +347,6 @@ class MatierePremiereAchat(models.Model):
 
     def __str__(self):
         return f"{self.ref} - {self.nom_matiere}"
-    
-
-    # A supprimer
-    # def update_quantity_after_usage(self, used_quantity):
-    #     if self.remaining_quantity < used_quantity:
-    #         return False
-    #     self.remaining_quantity -= used_quantity
-    #     self.save()
-    #     return True
-
 
 class MatiereUsage(models.Model):
     SOURCE_CHOICES = [
