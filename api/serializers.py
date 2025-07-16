@@ -670,24 +670,6 @@ class SoftDeletePlanTraiteFournisseurSerializer(serializers.Serializer):
         if not isinstance(value, bool):
             raise serializers.ValidationError("Ce champ doit être un booléen.")
         return value
-
-
-
-from rest_framework import serializers
-from .models import Employe, Avance, Remboursement, FichePaie
-
-class FichePaieSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = FichePaie
-        fields = '__all__'
-
-class EmployeSerializer(serializers.ModelSerializer):
-    fiches_paie = FichePaieSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = Employe
-        fields = '__all__'
-
 from .models import Avance
 # serializers.py
 
@@ -716,6 +698,25 @@ class AvanceSerializer(serializers.ModelSerializer):
 class RemboursementSerializer(serializers.ModelSerializer):
     class Meta:
         model = Remboursement
+        fields = '__all__'
+
+
+
+
+from rest_framework import serializers
+from .models import Employe, Avance, Remboursement, FichePaie
+
+
+class FichePaieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FichePaie
+        fields = '__all__'
+
+class EmployeSerializer(serializers.ModelSerializer):
+    fiches_paie = FichePaieSerializer(many=True, read_only=True)
+    avances = AvanceSerializer(many=True, read_only=True)
+    class Meta:
+        model = Employe
         fields = '__all__'
 
 
