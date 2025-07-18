@@ -912,6 +912,19 @@ class AvanceViewSet(viewsets.ModelViewSet):
 from rest_framework import viewsets
 from .models import Employe, FichePaie
 from .serializers import EmployeSerializer, FichePaieSerializer
+from .paie_utils import appliquer_remboursement_avance 
 class FichePaieViewSet(viewsets.ModelViewSet):
     queryset = FichePaie.objects.all()
     serializer_class = FichePaieSerializer
+
+def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fiche = serializer.save()  # création normale de la fiche
+
+        appliquer_remboursement_avance(fiche)  # ← applique automatiquement l’avance
+
+        # recharger la fiche mise à jour (net_a_payer, avance_deduite...)
+        serializer = self.get_serializer(fiche)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
