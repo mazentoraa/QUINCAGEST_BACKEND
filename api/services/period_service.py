@@ -1,7 +1,7 @@
 from datetime import date, timedelta
 from django.db.models import Sum, Q
 from api.models import Traite, Cd, FactureAchatMatiere, TraiteFournisseur
-from api.tresorerie.utils.dates import get_week_range
+from api.utils.dates import get_week_range
 from decimal import Decimal
 
 def compute_encaissements(start_date, end_date):

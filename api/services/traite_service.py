@@ -108,7 +108,6 @@ def get_all_traites():
             "trend": net_trend
         }
     }
-
     return {
         "traites": all_traites,
         "stats": stats
