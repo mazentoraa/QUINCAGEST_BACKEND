@@ -152,7 +152,7 @@ urlpatterns = [
         BonRetourFournisseurStatsView.as_view(),
         name="bons-retour-fournisseur-stats",
     ),
-    path("tresorerie/", include("tresorerie.urls")),
+    path("api/tresorerie/", include("api.tresorerie.urls")),
 ]
 
 app_name = "api"
