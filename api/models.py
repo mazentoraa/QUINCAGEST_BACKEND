@@ -2277,6 +2277,7 @@ class Remboursement(models.Model):
 
 class FichePaie(models.Model):
     employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='fiches_paie')
+    avance_deduite = models.FloatField(default=0)
     mois = models.IntegerField()
     annee = models.IntegerField()
     salaire_base = models.FloatField()
