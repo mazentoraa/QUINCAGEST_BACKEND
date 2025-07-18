@@ -9,6 +9,12 @@ from .views import (
     MatiereViewSet,
     ProduitViewSet,
     EntrepriseViewSet,
+    
+    #Tresorerie
+    KPIView,
+    ScheduleView,
+    TraiteView,
+    PeriodView
 )
 from .invoice_views import FactureTravauxViewSet
 from .installments_views import PlanTraiteViewSet, TraiteViewSet
@@ -152,7 +158,10 @@ urlpatterns = [
         BonRetourFournisseurStatsView.as_view(),
         name="bons-retour-fournisseur-stats",
     ),
-    path("api/tresorerie/", include("api.tresorerie.urls")),
+    path("api/kpis/", KPIView.as_view()),
+    path("api/schedule/", ScheduleView.as_view(), name="schedule"),
+    path("api/tresorerietraites/", TraiteView.as_view(), name="traites"),
+    path('api/period/', PeriodView.as_view(), name="period"),
 ]
 
 app_name = "api"
