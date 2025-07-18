@@ -69,8 +69,8 @@ class CdViewSet(viewsets.ModelViewSet):
                             quantite=produit_serializer.validated_data["quantite"],
                             prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
                             remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
-                            bon_source_id=produit_data.get("bon_id"), 
-                            bon_numero=produit_data.get("bon_numero"),
+                            bon_source_id=produit_serializer.validated_data.get("bonId"), 
+                            bon_numero=produit_serializer.validated_data.get("bon_numero"),
                         )
                     else:
                         print(f"Produit invalide: {produit_serializer.errors}")
@@ -90,12 +90,12 @@ class CdViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 # Check if product already exists in commande
                 produit = serializer.validated_data["produit"]
-                bon_id = serializer.validated_data["bonId"]
-                bon_numero = serializer.validated_data["bon_numero"]
+                bon_id = serializer.validated_data.get("bonId") 
+                bon_numero = serializer.validated_data.get("bon_numero")
                 produit_commande, created = PdC.objects.get_or_create(
                     cd=commande,
                     produit=produit,
-                    bon_id = bon_id,
+                    bon_source_id = bon_id,
                     bon_numero = bon_numero,
                     defaults={
                         "quantite": serializer.validated_data["quantite"],
@@ -319,3 +319,38 @@ class CdViewSet(viewsets.ModelViewSet):
                 {"error": f"Client with ID {client_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=False)
+
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        produits_data = request.data.get("produit_commande", [])
+
+        with transaction.atomic():
+            # Update the commande instance
+            commande = serializer.save()
+
+            # Optional: Clear existing products (if full replacement is expected)
+            PdC.objects.filter(cd=commande).delete()
+
+            # Insert/Update products
+            for produit_data in produits_data:
+                produit_serializer = CdPSerializer(data=produit_data)
+                if produit_serializer.is_valid():
+                    PdC.objects.create(
+                        cd=commande,
+                        produit=produit_serializer.validated_data["produit"],
+                        quantite=produit_serializer.validated_data["quantite"],
+                        prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
+                        remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
+                    )
+                else:
+                    print(f"Produit invalide: {produit_serializer.errors}")
+
+            # Recalculate totals
+            commande.calculate_totals()
+            commande.save()
+
+        return Response(self.get_serializer(commande).data)

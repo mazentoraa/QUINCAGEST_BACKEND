@@ -290,7 +290,72 @@ class Produit(models.Model):
         return self.nom_produit
 
 
+class MatierePremiereAchat(models.Model):
+    ref = models.CharField(max_length=100, unique=True)
+    nom_matiere = models.CharField(max_length=200)
+
+    categorie = models.CharField(
+        max_length=100,
+        choices=[
+            ("acier", "Acier"),
+            ("acier_inoxydable", "Acier inoxydable"),
+            ("aluminium", "Aluminium"),
+            ("laiton", "Laiton"),
+            ("cuivre", "Cuivre"),
+            ("acier_galvanise", "Acier galvanisé"),
+            ("metaux","Metaux"),
+            ("autre", "Autre"),
+        ],
+        default="autre",
+    )
+
+    description = models.TextField(blank=True, null=True)
+    unite_mesure = models.CharField(
+        max_length=10,
+        choices=[
+            ("kg", "Kilogramme"),
+            ("pcs", "Pièce"),
+            ("m2", "Mètre carré"),
+            ("m3", "Mètre cube"),
+        ],
+        default="kg"
+    )
+
+    longueur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
+    )
+    largeur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
+    )
+    epaisseur = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
+    )
+    surface = models.DecimalField(
+        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
+    )
+
+    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    emplacement = models.CharField(max_length=200, blank=True, null=True)
+
+    fournisseur_principal = models.CharField(max_length=200)
+    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
+    date_reception = models.DateField()
+    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.ref} - {self.nom_matiere}"
+
 class MatiereUsage(models.Model):
+    SOURCE_CHOICES = [
+        ("stock", "Main Stock"),
+        ("client", "Client Provided"),
+    ]
+
+    achat = models.ForeignKey(MatierePremiereAchat, null=True, blank=True, on_delete=models.SET_NULL)
+    
     travaux = models.ForeignKey(
         "Traveaux",
         on_delete=models.CASCADE,
@@ -298,35 +363,40 @@ class MatiereUsage(models.Model):
         help_text="Work",
     )
     matiere = models.ForeignKey(
-        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material"
+        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material", null=True, blank=True
     )
     quantite_utilisee = models.PositiveIntegerField(
         default=1, help_text="Quantity used in the work"
     )
+    source = models.CharField(null=True, choices=SOURCE_CHOICES, help_text="Material usage source, stock or client")
     is_deleted = models.BooleanField(default=False, help_text="Material usage deleted")
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the material usage was deleted"
     )
 
-    class Meta:
-        unique_together = ("travaux", "matiere")
+    # class Meta:
+        # unique_together = ("travaux", "matiere")
 
     def __str__(self):
-        return f"{self.matiere} - {self.quantite_utilisee} units for {self.travaux}"
+        name = self.matiere or self.achat
+        return f"{name} - {self.quantite_utilisee} units for {self.travaux}"
 
-    def save(self, *args, **kwargs):
-        # Check if this is a new instance being created
-        if not self.pk:
-            # Update material quantity
-            success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
-            if not success:
-                from django.core.exceptions import ValidationError
+    # def save(self, *args, **kwargs):
+    #     # Check if this is a new instance being created
+    #     if not self.pk:
+    #         # Update material quantity
+    #         if self.source == "client" and self.matiere:
+    #             success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
+    #         elif self.source == "stock" and self.achat:
+    #             success = self.achat.update_quantity_after_usage(self.quantite_utilisee)
+    #         if not success:
+    #             from django.core.exceptions import ValidationError
 
-                raise ValidationError(
-                    f"Insufficient quantity available for {self.matiere}. "
-                    f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
-                )
-        super().save(*args, **kwargs)
+    #             raise ValidationError(
+    #                 f"Insufficient quantity available for {self.matiere}. "
+    #                 f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
+    #             )
+    #     super().save(*args, **kwargs)
 
 
 class Traveaux(models.Model):
@@ -1231,22 +1301,28 @@ class Commande(models.Model):
         """Generate next sequential order number, filling gaps if any exist"""
         from datetime import datetime
         current_year = datetime.now().year
-        prefix = f"FAC{'-BL' if type_facture=='bon' else ''}-{current_year}-"
-
-        existing_commandes = Commande.objects.filter(
+        if nature == "facture":
+            prefix_type = "FAC-BL" if type_facture == "bon" else "FAC"
+        else:
+            prefix_type = "AV-BL" if type_facture == "bon" else "AV"
+        prefix = f"{prefix_type}-{current_year}-"
+        # Find the highest existing number for current year
+        existing_commandes = Cd.objects.filter(
             numero_commande__startswith=prefix
-        ).values_list('numero_commande', flat=True)
+        ).order_by("-numero_commande")
 
-        existing_numbers = {
-            int(numero.split("-")[-1])
-            for numero in existing_commandes
-            if numero.split("-")[-1].isdigit()
-        }
+        if existing_commandes.exists():
+            last_numero = existing_commandes.first().numero_commande
+            # Extract the sequential number part
+            try:
+                last_number = int(last_numero.split("-")[-1])
+                next_number = last_number + 1
+            except (ValueError, IndexError):
+                next_number = 1
+        else:
+            next_number = 1
 
-        next_number = 1
-        while next_number in existing_numbers:
-            next_number += 1
-
+        # Format with 5-digit zero padding
         return f"{prefix}{next_number:05d}"
 
     def generate_invoice(self):
@@ -1255,7 +1331,7 @@ class Commande(models.Model):
             return None
 
         facture = FactureTravaux.objects.create(
-            numero_facture=f"FAC- {self.numero_commande}",
+            numero_facture=f"FAC-{self.numero_commande}",
             client=self.client,
             date_emission=self.derniere_mise_a_jour.date(),
             statut="draft",
@@ -1403,7 +1479,7 @@ class PlanTraite(models.Model):
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ["-date_emission", "date_premier_echeance"]
+        ordering = ["-date_emission"]
         indexes = [
             models.Index(fields=["facture"]),
             models.Index(fields=["date_emission"]),
@@ -1423,6 +1499,9 @@ class PlanTraite(models.Model):
             self._create_traites()
 
     def _create_traites(self):
+        # Vérifier s'il y a déjà des traites pour ce plan
+        if self.traites.exists():
+            return  # Ne rien faire si des traites existent déjà
         if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
             montant_par_traite = self.montant_total / self.nombre_traite
             for i in range(self.nombre_traite):
@@ -1870,68 +1949,6 @@ class MatierePurchase(models.Model):
     #         self.remaining_quantity = self.quantite
     #     super().save(*args, **kwargs)
 
-   
-
-
-class MatierePremiereAchat(models.Model):
-    ref = models.CharField(max_length=100, unique=True)
-    nom_matiere = models.CharField(max_length=200)
-
-    categorie = models.CharField(
-        max_length=100,
-        choices=[
-            ("acier", "Acier"),
-            ("acier_inoxydable", "Acier inoxydable"),
-            ("aluminium", "Aluminium"),
-            ("laiton", "Laiton"),
-            ("cuivre", "Cuivre"),
-            ("acier_galvanise", "Acier galvanisé"),
-            ("metaux","Metaux"),
-            ("autre", "Autre"),
-        ],
-        default="autre",
-    )
-
-    description = models.TextField(blank=True, null=True)
-    unite_mesure = models.CharField(
-        max_length=10,
-        choices=[
-            ("kg", "Kilogramme"),
-            ("pcs", "Pièce"),
-            ("m2", "Mètre carré"),
-            ("m3", "Mètre cube"),
-        ],
-        default="kg"
-    )
-
-    longueur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
-    )
-    largeur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
-    )
-    epaisseur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
-    )
-    surface = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
-    )
-
-    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    emplacement = models.CharField(max_length=200, blank=True, null=True)
-
-    fournisseur_principal = models.CharField(max_length=200)
-    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
-    date_reception = models.DateField()
-    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.ref} - {self.nom_matiere}"
-
-
 class FactureAchatMatiere(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
     fournisseur = models.CharField(max_length=255, blank=True, null=True)
@@ -1941,6 +1958,18 @@ class FactureAchatMatiere(models.Model):
         ('consommable', 'consommable'),
         ('autres', 'autres'),
     ]
+    mode_paiement = models.CharField(
+        max_length=20,
+        choices=[
+            ("traite", "Traite"),
+            ("cash", "Comptant"),
+            ("cheque", "Cheque"),
+            ("virement", "Virement"),
+            ("carte", "Carte"),
+        ],
+        default="cash",
+        help_text="Payment method",
+    )
     type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
 
     prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
@@ -2011,3 +2040,275 @@ class Consommable(models.Model):
 
     def __str__(self):
         return self.nom
+
+from django.db import models
+from .models import Fournisseur, Matiere
+
+class BonRetourFournisseur(models.Model):
+    numero_bon = models.CharField(max_length=50, unique=True)
+    fournisseur = models.ForeignKey(
+        Fournisseur,
+        on_delete=models.CASCADE,
+        related_name="bons_retour_fournisseur",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("draft", "Brouillon"),
+            ("sent", "Envoyée"),
+            ("completed", "Complété"),
+            ("cancelled", "Annulée"),
+        ],
+        default="draft",
+    )
+    date_reception = models.DateField()
+    date_retour = models.DateField()
+    date_emission = models.DateField(auto_now_add=True)
+    notes = models.TextField(blank=True, null=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    derniere_mise_a_jour = models.DateTimeField(auto_now=True)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+
+class MatiereRetourFournisseur(models.Model):
+    bon_retour = models.ForeignKey(
+        BonRetourFournisseur,
+        on_delete=models.CASCADE,
+        related_name="matiere_retours",
+    )
+    matiere = models.ForeignKey(
+        Matiere,
+        on_delete=models.CASCADE,
+        related_name="retours_fournisseur",
+        null=True,
+        blank=True,
+    )
+    nom_matiere = models.CharField(max_length=255, null=True, blank=True)
+    quantite_retournee = models.PositiveIntegerField(default=1)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+
+from datetime import timedelta
+from django.db import models
+
+
+class PlanTraiteFournisseur(models.Model):
+    STATUT_CHOICES = [
+        ("NON_PAYEE", "Non payée"),
+        ("PAYEE", "Payée"),
+        ("PARTIELLEMENT_PAYEE", "Partiellement payée"),
+    ]
+
+    facture = models.OneToOneField(
+        'FactureAchatMatiere', on_delete=models.CASCADE, null=True, blank=True
+    )
+    fournisseur = models.ForeignKey(
+        "Fournisseur", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    numero_facture = models.CharField(max_length=50, blank=True, null=True)
+    nombre_traite = models.PositiveIntegerField()
+    date_emission = models.DateField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=STATUT_CHOICES, default="NON_PAYEE")
+    date_premier_echeance = models.DateField(null=True, blank=True)
+    periode = models.PositiveIntegerField(null=True, blank=True)
+    montant_total = models.FloatField(null=True, blank=True)
+    nom_raison_sociale = models.CharField(max_length=255, blank=True, null=True)
+    matricule_fiscal = models.CharField(max_length=255, blank=True, null=True)
+    mode_paiement = models.CharField(
+        max_length=20,
+        choices=[
+            ("traite", "Traite"),
+            ("cash", "Comptant"),
+            ("mixte", "Mixte"),
+            ("virement", "Virement"),
+        ],
+        default="traite"
+    )
+    rip = models.CharField(max_length=40, null=True, blank=True)
+    acceptance = models.TextField(null=True, blank=True)
+    notice = models.TextField(null=True, blank=True)
+    bank_name = models.CharField(max_length=255, null=True, blank=True)
+    bank_address = models.TextField(null=True, blank=True)
+    is_deleted = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-date_emission", "date_premier_echeance"]
+        indexes = [
+            models.Index(fields=["facture"]),
+            models.Index(fields=["date_emission"]),
+            models.Index(fields=["date_premier_echeance"]),
+            models.Index(fields=["status"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.montant_total and self.facture_id:
+            self.montant_total = float(self.facture.prix_total or 0)
+
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+
+        if creating:
+            self._create_traites()
+
+    def _create_traites(self):
+        # Vérifier s'il y a déjà des traites pour ce plan
+        if self.traites.exists():
+            return  # Ne rien faire si des traites existent déjà
+        if self.nombre_traite > 0 and self.date_premier_echeance and self.montant_total:
+            montant_par_traite = self.montant_total / self.nombre_traite
+            for i in range(self.nombre_traite):
+                date_echeance = (
+                    self.date_premier_echeance if i == 0 else
+                    self.date_premier_echeance + timedelta(days=i * (self.periode or 30))
+                )
+                TraiteFournisseur.objects.create(
+                    plan_traite=self,
+                    date_echeance=date_echeance,
+                    montant=round(montant_par_traite, 3),
+                    status="NON_PAYEE"
+                )
+
+
+class TraiteFournisseur(models.Model):
+    STATUT_CHOICES = [
+        ("NON_PAYEE", "Non payée"),
+        ("PAYEE", "Payée"),
+        ("PARTIELLEMENT_PAYEE", "Partiellement payée"),
+    ]
+
+    plan_traite = models.ForeignKey(
+        PlanTraiteFournisseur,
+        on_delete=models.CASCADE,
+        related_name="traites"
+    )
+    date_echeance = models.DateField(help_text="Date d'échéance")
+    status = models.CharField(
+        max_length=255,
+        choices=STATUT_CHOICES,
+        default="NON_PAYEE"
+    )
+    montant = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-date_echeance"]
+        indexes = [
+            models.Index(fields=["plan_traite"]),
+            models.Index(fields=["date_echeance"]),
+            models.Index(fields=["status"]),
+        ]
+
+
+from django.db import models
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+from django.db import models
+
+class Employe(models.Model):
+    id_employe = models.CharField(max_length=100, unique=True)
+    nom = models.CharField(max_length=255)
+    cin = models.CharField(max_length=50, blank=True, null=True)
+    telephone = models.CharField(max_length=50, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    date_naissance = models.DateField(blank=True, null=True)
+    adresse = models.TextField(blank=True, null=True)
+
+    # ✅ Nouveaux champs
+    numero_cnss = models.CharField(max_length=50, blank=True, null=True)
+    situation_familiale = models.CharField(max_length=50, blank=True, null=True)
+    enfants_a_charge = models.IntegerField(blank=True, null=True)
+    nombre_enfants = models.IntegerField(blank=True, null=True)
+    categorie = models.CharField(max_length=50, blank=True, null=True)
+
+    # Infos pro
+    poste = models.CharField(max_length=100, blank=True, null=True)
+    departement = models.CharField(max_length=100, blank=True, null=True)
+    date_embauche = models.DateField(blank=True, null=True)
+    statut = models.CharField(max_length=50, blank=True, null=True)
+    code_contrat = models.CharField(max_length=50, blank=True, null=True)
+    type_contrat = models.CharField(max_length=50, blank=True, null=True)
+    responsable = models.CharField(max_length=255, blank=True, null=True)
+    salaire = models.FloatField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.nom
+
+class Avance(models.Model):
+    STATUT_CHOICES = (
+        ('En attente', 'En attente'),
+        ('Acceptée', 'Acceptée'),
+        ('Refusée', 'Refusée'),
+    )
+
+    employee = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='avances')
+    montant = models.FloatField()
+    date_demande = models.DateField(default=timezone.now)
+    motif = models.TextField()
+    nbr_mensualite = models.IntegerField()
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='En attente')
+
+    def mensualite(self):
+        if self.nbr_mensualite:
+            return round(self.montant / self.nbr_mensualite, 2)
+        return 0
+
+    def progression(self):
+        if self.statut != 'Acceptée':
+            return 0
+        rembourse = Remboursement.objects.filter(avance=self).aggregate(total=models.Sum('montant'))['total'] or 0
+        return min(100, round((rembourse / self.montant) * 100, 1)) if self.montant else 0
+
+    def reste(self):
+        rembourse = Remboursement.objects.filter(avance=self).aggregate(total=models.Sum('montant'))['total'] or 0
+        return round(self.montant - rembourse, 2)
+
+    def __str__(self):
+        return f"Avance - {self.employee} - {self.montant} DH"
+        
+
+class Remboursement(models.Model):
+    avance = models.ForeignKey(Avance, on_delete=models.CASCADE, related_name='remboursements')
+    date = models.DateField(default=timezone.now)
+    montant = models.FloatField()
+
+
+class FichePaie(models.Model):
+    employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name='fiches_paie')
+    mois = models.IntegerField()
+    annee = models.IntegerField()
+    salaire_base = models.FloatField()
+    prime_anciennete = models.FloatField(default=0)
+    indemnite_presence = models.FloatField(default=0)
+    indemnite_transport = models.FloatField(default=0)
+    prime_langue = models.FloatField(default=0)
+    jours_feries_payes = models.FloatField(default=0)
+    absences_non_remunerees = models.FloatField(default=0)
+    prime_ramadan = models.FloatField(default=0)
+    prime_teletravail = models.FloatField(default=0)
+    avantage_assurance = models.FloatField(default=0)
+    conge_precedent = models.FloatField(default=0)
+    conge_acquis = models.FloatField(default=0)
+    conge_pris = models.FloatField(default=0)
+    conge_restant = models.FloatField(default=0)
+    conge_speciaux = models.FloatField(default=0)
+    conge_maladie_m = models.FloatField(default=0)
+    conge_maladie_a = models.FloatField(default=0)
+    banque = models.CharField(max_length=100, null=True, blank=True)
+    rib = models.CharField(max_length=100, null=True, blank=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+    statut = models.CharField(max_length=50, default='Générée')
+
+    # Calculs (déjà calculés en front, mais prévues ici pour cohérence)
+    salaire_brut = models.FloatField(default=0)
+    salaire_imposable = models.FloatField(default=0)
+    cnss_salarie = models.FloatField(default=0)
+    irpp = models.FloatField(default=0)
+    css = models.FloatField(default=0)
+    deduction_totale = models.FloatField(default=0)
+    cnss_patronal = models.FloatField(default=0)
+    accident_travail = models.FloatField(default=0)
+    charges_patronales = models.FloatField(default=0)
+    net_a_payer = models.FloatField(default=0)
