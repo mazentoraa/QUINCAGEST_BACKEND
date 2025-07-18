@@ -1479,7 +1479,7 @@ class PlanTraite(models.Model):
     is_deleted = models.BooleanField(default=False)
 
     class Meta:
-        ordering = ["-date_emission", "date_premier_echeance"]
+        ordering = ["-date_emission"]
         indexes = [
             models.Index(fields=["facture"]),
             models.Index(fields=["date_emission"]),

@@ -96,9 +96,6 @@ class CdPSerializer(serializers.Serializer):
     """Serializer to add products to a commande"""
 
     produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
-    """Serializer to add products to a commande"""
-
-    produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
     quantite = serializers.IntegerField(min_value=1)
     prix_unitaire = serializers.FloatField(required=False, allow_null=True)
     remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
