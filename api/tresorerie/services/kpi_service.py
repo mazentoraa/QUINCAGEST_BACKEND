@@ -1,6 +1,6 @@
 from django.db.models import Sum, F
 from api.models import FactureTravaux, Cd, MatierePremiereAchat
-from tresorerie.utils.dates import get_week_range
+from api.tresorerie.utils.dates import get_week_range
 from decimal import Decimal
 
 def compute_trend(model, date_field, filters=None, range_func=None, aggregate_expression=None, offset=0):
