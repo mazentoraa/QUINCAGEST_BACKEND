@@ -100,7 +100,7 @@ class CdPSerializer(serializers.Serializer):
     prix_unitaire = serializers.FloatField(required=False, allow_null=True)
     remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
     bon_id = serializers.PrimaryKeyRelatedField(queryset=FactureTravaux.objects.all(), required=False, allow_null=True)
-    bon_numero = serializers.CharField(required=False, allow_blank=True)
+    bon_numero = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 class CdGenerateInvoiceSerializer(serializers.Serializer):
     """Serializer to validate generating an invoice from an order"""
