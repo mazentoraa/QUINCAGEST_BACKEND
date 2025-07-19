@@ -22,14 +22,21 @@ class CdViewSet(viewsets.ModelViewSet):
     queryset = Cd.objects.all()  # required by DRF router
 
     def get_queryset(self):
+        show_deleted = self.request.query_params.get("deleted")
         nature = self.request.query_params.get("nature")
-        qs = Cd.objects.all().order_by("-date_commande", "-numero_commande")
-        
+
+        qs = Cd.objects.all()
+
         if nature:
             qs = qs.filter(nature=nature)
-        
+
+        if show_deleted == "true":
+            qs = qs.filter(is_deleted=True)
+        else:
+            qs = qs.filter(is_deleted=False)
+
         return qs
-    
+
     def get_serializer_class(self):
         if self.action == "list":
             return CdListSerializer
@@ -319,6 +326,7 @@ class CdViewSet(viewsets.ModelViewSet):
                 {"error": f"Client with ID {client_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=False)
@@ -354,3 +362,151 @@ class CdViewSet(viewsets.ModelViewSet):
             commande.save()
 
         return Response(self.get_serializer(commande).data)
+
+    # Enhanced restore method with better error handling and debugging
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """
+        Restore a logically deleted invoice/commande
+        """
+        print(f"🔄 Attempting to restore Cd with ID: {pk}")
+        
+        try:
+            # First, let's check if the object exists at all (including deleted ones)
+            try:
+                commande = Cd.objects.get(pk=pk)
+                print(f"✅ Found Cd object: ID={commande.id}, is_deleted={commande.is_deleted}, nature={getattr(commande, 'nature', 'N/A')}")
+            except Cd.DoesNotExist:
+                print(f"❌ No Cd object found with ID: {pk}")
+                # Let's see what IDs actually exist
+                existing_ids = list(Cd.objects.all().values_list('id', flat=True))
+                deleted_ids = list(Cd.objects.filter(is_deleted=True).values_list('id', flat=True))
+                print(f"📊 All existing Cd IDs: {existing_ids}")
+                print(f"🗑️ Deleted Cd IDs: {deleted_ids}")
+                
+                return Response(
+                    {
+                        "error": f"No Cd object found with ID {pk}",
+                        "existing_ids": existing_ids[:10],  # Show first 10 for debugging
+                        "deleted_ids": deleted_ids[:10],
+                        "total_records": len(existing_ids)
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Check if it's actually deleted
+            if not commande.is_deleted:
+                print(f"⚠️ Warning: Cd {pk} is not marked as deleted (is_deleted={commande.is_deleted})")
+                return Response(
+                    {
+                        "error": f"Cd {pk} is not deleted and cannot be restored",
+                        "current_status": "active",
+                        "is_deleted": commande.is_deleted
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Restore the record
+            commande.is_deleted = False
+            commande.save()
+            
+            print(f"✅ Successfully restored Cd {pk}")
+            
+            return Response(
+                {
+                    "message": f"Cd {pk} restored successfully",
+                    "id": commande.id,
+                    "numero_commande": getattr(commande, 'numero_commande', None),
+                    "client": getattr(commande.client, 'nom_client', None) if hasattr(commande, 'client') and commande.client else None,
+                    "is_deleted": commande.is_deleted
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            print(f"❌ Unexpected error in restore: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            return Response(
+                {
+                    "error": f"Unexpected error during restore: {str(e)}",
+                    "id_requested": pk
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # Pour mettre en corbeille une facture
+    @action(detail=True, methods=["post"])
+    def delete_logically(self, request, pk=None):
+        """
+        Soft delete a commande/invoice
+        """
+        print(f"🗑️ Attempting to soft delete Cd with ID: {pk}")
+        
+        try:
+            commande = self.get_object()
+            
+            if commande.is_deleted:
+                return Response(
+                    {"error": "This record is already deleted"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            commande.is_deleted = True
+            commande.save()
+            
+            print(f"✅ Successfully soft deleted Cd {pk}")
+            
+            return Response(
+                {
+                    "message": "Facture mise en corbeille.",
+                    "id": commande.id,
+                    "is_deleted": commande.is_deleted
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Cd.DoesNotExist:
+            return Response(
+                {"error": f"Cd with ID {pk} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"❌ Unexpected error in delete_logically: {str(e)}")
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    # Add a debug endpoint to help troubleshoot
+    @action(detail=False, methods=["get"])
+    def debug_records(self, request):
+        """
+        Debug endpoint to show record counts and sample data
+        """
+        total_count = Cd.objects.count()
+        active_count = Cd.objects.filter(is_deleted=False).count()
+        deleted_count = Cd.objects.filter(is_deleted=True).count()
+        
+        # Sample active records
+        active_sample = list(Cd.objects.filter(is_deleted=False)[:5].values(
+            'id', 'numero_commande', 'is_deleted', 'client__nom_client'
+        ))
+        
+        # Sample deleted records
+        deleted_sample = list(Cd.objects.filter(is_deleted=True)[:5].values(
+            'id', 'numero_commande', 'is_deleted', 'client__nom_client'
+        ))
+        
+        return Response({
+            "summary": {
+                "total_records": total_count,
+                "active_records": active_count,
+                "deleted_records": deleted_count
+            },
+            "samples": {
+                "active": active_sample,
+                "deleted": deleted_sample
+            }
+        })

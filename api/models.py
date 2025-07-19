@@ -1737,7 +1737,8 @@ class Cd(models.Model):
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Last update date"
     )
-
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     class Meta:
         ordering = ["-date_commande", "-numero_commande"]
         indexes = [
