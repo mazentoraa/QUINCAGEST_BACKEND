@@ -76,7 +76,7 @@ class CdViewSet(viewsets.ModelViewSet):
                             quantite=produit_serializer.validated_data["quantite"],
                             prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
                             remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
-                            bon_source_id=produit_serializer.validated_data.get("bonId"), 
+                            bon_id=produit_serializer.validated_data.get("bon_id"), 
                             bon_numero=produit_serializer.validated_data.get("bon_numero"),
                         )
                     else:
@@ -102,7 +102,7 @@ class CdViewSet(viewsets.ModelViewSet):
                 produit_commande, created = PdC.objects.get_or_create(
                     cd=commande,
                     produit=produit,
-                    bon_source_id = bon_id,
+                    bon_id = bon_id,
                     bon_numero = bon_numero,
                     defaults={
                         "quantite": serializer.validated_data["quantite"],
@@ -335,7 +335,7 @@ class CdViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         produits_data = request.data.get("produit_commande", [])
-
+        print(produits_data)
         with transaction.atomic():
             # Update the commande instance
             commande = serializer.save()
@@ -353,6 +353,8 @@ class CdViewSet(viewsets.ModelViewSet):
                         quantite=produit_serializer.validated_data["quantite"],
                         prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
                         remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
+                        bon_id=produit_serializer.validated_data.get("bon_id"),
+                        bon_numero=produit_serializer.validated_data.get("bon_numero"),
                     )
                 else:
                     print(f"Produit invalide: {produit_serializer.errors}")

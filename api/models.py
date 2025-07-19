@@ -1872,7 +1872,7 @@ class PdC(models.Model):
         related_name="cd_produits",
         help_text="Product",
     )
-    bon_source = models.ForeignKey(FactureTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
+    bon_id = models.ForeignKey(FactureTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
     bon_numero = models.CharField(max_length=100, null=True, blank=True)
     quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
     prix_unitaire = models.FloatField(
