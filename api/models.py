@@ -462,10 +462,11 @@ class FactureTravaux(models.Model):
     ]
     FACTURE_TYPES = (
         ('facture', 'Facture'),
+        ('avoir-facture', 'Avoir-facture'),
         ('avoir', 'Avoir'),
     )
     
-    nature = models.CharField(max_length=10, choices=FACTURE_TYPES, default='facture')
+    nature = models.CharField(max_length=20, choices=FACTURE_TYPES, default='facture')
 
     numero_facture = models.CharField(
         max_length=50, unique=True, help_text="Invoice number"
@@ -566,7 +567,7 @@ class FactureTravaux(models.Model):
                     total_ht += pu * qte
         tax_rate = Decimal(self.tax_rate or 0)
 
-        # Facture ou avoir
+        # Facture ou avoir-facture ou avoir
         if self.nature == 'facture':
             fodec = (total_ht * Decimal('0.01')).quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
             timbre = Decimal(getattr(self, 'timbre_fiscal', 0))
@@ -1303,6 +1304,8 @@ class Commande(models.Model):
         current_year = datetime.now().year
         if nature == "facture":
             prefix_type = "FAC-BL" if type_facture == "bon" else "FAC"
+        elif nature =="avoir-facture":
+            prefix_type = "AV-FAC-BL" if type_facture == "bon" else "AV-FAC"
         else:
             prefix_type = "AV-BL" if type_facture == "bon" else "AV"
         prefix = f"{prefix_type}-{current_year}-"
@@ -1645,10 +1648,11 @@ class Cd(models.Model):
 
     FACTURE_TYPES = (
         ('facture', 'Facture'),
+        ('avoir-facture', 'Avoir-facture'),
         ('avoir', 'Avoir'),
     )
     
-    nature = models.CharField(max_length=10, choices=FACTURE_TYPES, default='facture')
+    nature = models.CharField(max_length=20, choices=FACTURE_TYPES, default='facture')
 
     numero_commande = models.CharField(
         max_length=50, unique=True, help_text="Order number"
@@ -1808,6 +1812,8 @@ class Cd(models.Model):
         current_year = datetime.now().year
         if nature == "facture":
             prefix_type = "FAC-BL" if type_facture == "bon" else "FAC"
+        elif nature == "avoir-facture":
+            prefix_type = "AV-FAC-BL" if type_facture == "bon" else "AV-FAC"
         else:
             prefix_type = "AV-BL" if type_facture == "bon" else "AV"
         prefix = f"{prefix_type}-{current_year}-"

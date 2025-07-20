@@ -13,6 +13,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='facturetravaux',
             name='nature',
-            field=models.CharField(choices=[('facture', 'Facture'), ('avoir', 'Avoir')], default='facture', max_length=10),
+            field=models.CharField(choices=[('facture', 'Facture'), ('avoir-facture', 'Avoir-facture'), ('avoir', 'Avoir')], default='facture', max_length=10),
         ),
     ]
