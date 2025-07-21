@@ -164,16 +164,32 @@ class TraveauxViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAdminUser
+from django.db.models import Q
+from django.utils import timezone
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from .models import Client
+from .serializers import ClientSerializer
+
+
 class ClientViewSet(viewsets.ModelViewSet):
     """
-    API pour la gestion des clients.
-
-    Liste tous les clients, crée de nouveaux clients, et modifie ou supprime les clients existants.
+    API pour la gestion des clients avec support de la corbeille.
     """
 
     permission_classes = [IsAdminUser]
-    queryset = Client.objects.all().order_by("nom_client")
     serializer_class = ClientSerializer
+    queryset = Client.objects.all()  # <-- Ajout obligatoire
+
+    def get_queryset(self):
+        """
+        Retourne seulement les clients non supprimés par défaut
+        """
+        return Client.objects.filter(is_deleted=False).order_by("nom_client")
 
     @swagger_auto_schema(
         operation_description="Rechercher des clients par nom ou numéro fiscal",
@@ -186,15 +202,12 @@ class ClientViewSet(viewsets.ModelViewSet):
                 required=True,
             )
         ],
-        responses={
-            200: ClientSerializer(many=True),
-            400: "Paramètre de recherche manquant",
-        },
+        responses={200: ClientSerializer(many=True), 400: "Paramètre manquant"},
     )
     @action(detail=False, methods=["get"])
     def search(self, request):
         """
-        Search clients by name or fiscal number
+        Recherche de clients actifs (nom ou numéro fiscal)
         """
         query = request.query_params.get("query", None)
         if not query:
@@ -203,7 +216,7 @@ class ClientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        clients = self.queryset.filter(
+        clients = self.get_queryset().filter(
             Q(nom_client__icontains=query) | Q(numero_fiscal__icontains=query)
         )
 
@@ -211,39 +224,91 @@ class ClientViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @swagger_auto_schema(
-        operation_description="Créer un nouveau client",
+        operation_description="Récupérer les clients supprimés (corbeille)",
+        responses={200: ClientSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"])
+    def deleted(self, request):
+        """
+        Retourne les clients dans la corbeille
+        """
+        clients = Client.objects.filter(is_deleted=True).order_by("-deleted_at")
+        serializer = self.get_serializer(clients, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_description="Déplacer un client vers la corbeille",
+        responses={200: "Client supprimé logiquement", 404: "Non trouvé"},
+    )
+    @action(detail=True, methods=["patch"])
+    def soft_delete(self, request, pk=None):
+        """
+        Suppression logique (corbeille)
+        """
+        try:
+            client = self.get_object()
+            client.is_deleted = True
+            client.deleted_at = timezone.now()
+            client.save()
+            return Response({"message": "Client déplacé dans la corbeille"}, status=status.HTTP_200_OK)
+        except Client.DoesNotExist:
+            return Response({"message": "Client non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+
+    @swagger_auto_schema(
+        operation_description="Restaurer un client depuis la corbeille",
+        responses={200: ClientSerializer, 404: "Client non trouvé"},
+    )
+    @action(detail=True, methods=["patch"])
+    def restore(self, request, pk=None):
+        """
+        Restaurer un client supprimé
+        """
+        try:
+            client = Client.objects.get(pk=pk, is_deleted=True)
+            client.is_deleted = False
+            client.deleted_at = None
+            client.save()
+            serializer = self.get_serializer(client)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Client.DoesNotExist:
+            return Response({"message": "Client non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Suppression définitive
+        """
+        try:
+            client = Client.objects.get(pk=kwargs['pk'])
+            client.delete()
+            return Response({"message": "Client supprimé définitivement"}, status=status.HTTP_200_OK)
+        except Client.DoesNotExist:
+            return Response({"message": "Client non trouvé"}, status=status.HTTP_404_NOT_FOUND)
+
+    @swagger_auto_schema(
+        operation_description="Créer un client",
         request_body=ClientSerializer,
-        responses={201: ClientSerializer, 400: "Données invalides ou incomplètes"},
+        responses={201: ClientSerializer, 400: "Données invalides"},
     )
     def create(self, request, *args, **kwargs):
-        """
-        Create a new client with validation
-        """
         if not request.data.get("nom_client") or not request.data.get("numero_fiscal"):
             return Response(
-                {"message": "Le nom du client et le numéro fiscal sont obligatoires"},
+                {"message": "Le nom et le numéro fiscal sont obligatoires"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         return super().create(request, *args, **kwargs)
 
     @swagger_auto_schema(
-        operation_description="Mettre à jour un client existant",
+        operation_description="Mettre à jour un client",
         request_body=ClientSerializer,
-        responses={200: ClientSerializer, 400: "Données invalides ou incomplètes"},
+        responses={200: ClientSerializer, 400: "Données invalides"},
     )
     def update(self, request, *args, **kwargs):
-        """
-        Update an existing client with validation
-        """
         if not request.data.get("nom_client") or not request.data.get("numero_fiscal"):
             return Response(
-                {"message": "Le nom du client et le numéro fiscal sont obligatoires"},
+                {"message": "Le nom et le numéro fiscal sont obligatoires"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         return super().update(request, *args, **kwargs)
-
 
 class ProduitViewSet(viewsets.ModelViewSet):
     """
