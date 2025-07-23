@@ -2320,3 +2320,118 @@ class FichePaie(models.Model):
     accident_travail = models.FloatField(default=0)
     charges_patronales = models.FloatField(default=0)
     net_a_payer = models.FloatField(default=0)
+
+
+
+from django.db import models
+from django.core.validators import MinValueValidator
+from decimal import Decimal
+
+class Avoir(models.Model):
+    TYPE_AVOIR_CHOICES = [
+        ('retour marchandise', 'Retour marchandise'),
+        ('remise commerciale', 'Remise commerciale'),
+        ('erreur facturation', 'Erreur facturation'),
+        ('autres', 'Autres'),
+    ]
+    
+    MODE_PAIEMENT_CHOICES = [
+        ('cash', 'Comptant'),
+        ('cheque', 'Chèque'),
+        ('virement', 'Virement Bancaire'),
+        ('carte', 'Carte de crédit'),
+        ('traite', 'Traite'),
+    ]
+    
+    numero = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    fournisseur = models.CharField(max_length=255, blank=True, null=True)
+    type_avoir = models.CharField(
+        max_length=50, 
+        choices=TYPE_AVOIR_CHOICES, 
+        blank=True, 
+        null=True
+    )
+    mode_paiement = models.CharField(
+        max_length=20, 
+        choices=MODE_PAIEMENT_CHOICES, 
+        default='cash'
+    )
+    montant_total = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        blank=True, 
+        null=True,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    date_avoir = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    deleted_at = models.DateTimeField(null=True, blank=True)
+class Meta:
+    db_table = 'avoir'
+    
+    def soft_delete(self):
+        """Suppression soft"""
+        self.deleted_at = timezone.now()
+        self.save()
+    
+    def restore(self):
+        """Restaurer l'avoir"""
+        self.deleted_at = None
+        self.save()
+    
+    @property
+    def is_deleted(self):
+        return self.deleted_at is not None
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Avoir"
+        verbose_name_plural = "Avoirs"
+    
+    def __str__(self):
+        return f"Avoir {self.numero or self.id} - {self.fournisseur or 'Sans fournisseur'}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-générer le numéro si pas fourni
+        if not self.numero:
+            last_avoir = Avoir.objects.filter(numero__startswith='AV-').order_by('id').last()
+            if last_avoir and last_avoir.numero:
+                try:
+                    last_num = int(last_avoir.numero.split('-')[-1])
+                    self.numero = f"AV-2024-{last_num + 1:03d}"
+                except (ValueError, IndexError):
+                    self.numero = "AV-2024-001"
+            else:
+                self.numero = "AV-2024-001"
+        super().save(*args, **kwargs)
+
+
+class AvoirArticle(models.Model):
+    avoir = models.ForeignKey(
+        Avoir, 
+        on_delete=models.CASCADE, 
+        related_name='articles'
+    )
+    nom = models.CharField(max_length=255)
+    prix = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.00'))]
+    )
+    quantite = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "Article d'avoir"
+        verbose_name_plural = "Articles d'avoir"
+    
+    def __str__(self):
+        return f"{self.nom} - {self.quantite} x {self.prix}"
+    
+    @property
+    def total(self):
+        return self.prix * self.quantite

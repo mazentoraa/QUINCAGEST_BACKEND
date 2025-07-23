@@ -1089,3 +1089,111 @@ def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(fiche)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db.models import Q, Sum
+from django.utils import timezone
+from .models import Avoir, AvoirArticle
+from .serializers import AvoirSerializer
+
+class AvoirViewSet(viewsets.ModelViewSet):
+    queryset = Avoir.objects.all().prefetch_related('articles')
+    serializer_class = AvoirSerializer
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filtres depuis les query parameters
+        numero = self.request.query_params.get('numero')
+        fournisseur = self.request.query_params.get('fournisseur')
+        type_avoir = self.request.query_params.get('type_avoir')
+        date_debut = self.request.query_params.get('date_debut')
+        date_fin = self.request.query_params.get('date_fin')
+        
+        if numero:
+            queryset = queryset.filter(numero__icontains=numero)
+        
+        if fournisseur:
+            queryset = queryset.filter(fournisseur__icontains=fournisseur)
+        
+        if type_avoir:
+            queryset = queryset.filter(type_avoir=type_avoir)
+        
+        if date_debut:
+            queryset = queryset.filter(date_avoir__gte=date_debut)
+        
+        if date_fin:
+            queryset = queryset.filter(date_avoir__lte=date_fin)
+        
+        return queryset
+    
+    @action(detail=False, methods=['get'])
+    def statistiques(self, request):
+        """Retourne les statistiques des avoirs"""
+        queryset = self.get_queryset()
+        
+        stats = {
+            'total_avoirs': queryset.count(),
+            'montant_total': queryset.aggregate(
+                total=Sum('montant_total')
+            )['total'] or 0,
+            'par_type': {},
+            'par_mode_paiement': {},
+            'recent_avoirs': AvoirSerializer(
+                queryset[:5], many=True, context={'request': request}
+            ).data
+        }
+        
+        # Statistiques par type
+        for choice in Avoir.TYPE_AVOIR_CHOICES:
+            type_code = choice[0]
+            count = queryset.filter(type_avoir=type_code).count()
+            if count > 0:
+                stats['par_type'][choice[1]] = count
+        
+        # Statistiques par mode de paiement
+        for choice in Avoir.MODE_PAIEMENT_CHOICES:
+            mode_code = choice[0]
+            count = queryset.filter(mode_paiement=mode_code).count()
+            if count > 0:
+                stats['par_mode_paiement'][choice[1]] = count
+        
+        return Response(stats)
+    
+    @action(detail=True, methods=['post'])
+    def dupliquer(self, request, pk=None):
+        """Duplique un avoir existant"""
+        avoir_original = self.get_object()
+        
+        # Créer une copie
+        avoir_copie = Avoir.objects.create(
+            fournisseur=avoir_original.fournisseur,
+            type_avoir=avoir_original.type_avoir,
+            mode_paiement=avoir_original.mode_paiement,
+            montant_total=avoir_original.montant_total,
+            date_avoir=timezone.now().date()
+        )
+        
+        # Copier les articles
+        for article in avoir_original.articles.all():
+            AvoirArticle.objects.create(
+                avoir=avoir_copie,
+                nom=article.nom,
+                prix=article.prix,
+                quantite=article.quantite
+            )
+        
+        serializer = self.get_serializer(avoir_copie)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def destroy(self, request, *args, **kwargs):
+        """Suppression avec message de confirmation"""
+        instance = self.get_object()
+        numero = instance.numero or f"ID-{instance.id}"
+        self.perform_destroy(instance)
+        return Response({
+            'message': f'Avoir {numero} supprimé avec succès'
+        }, status=status.HTTP_200_OK)

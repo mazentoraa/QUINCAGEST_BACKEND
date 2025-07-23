@@ -49,6 +49,7 @@ from .views import (
 from .views import PlanTraiteFournisseurViewSet, TraiteFournisseurViewSet
 from .views import EmployeViewSet
 from .views import AvanceViewSet,FichePaieViewSet
+from .views import AvoirViewSet
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
 router.register(r"traveaux", TraveauxViewSet)
@@ -80,6 +81,7 @@ router.register(r'employes', EmployeViewSet)
 router.register(r'avances', AvanceViewSet, basename='avance')
 router.register(r'fiches-paie', FichePaieViewSet)
 
+router.register(r'avoirs', AvoirViewSet)
 urlpatterns = [
     path("api/", include(router.urls)),
     path("api/auth/login/", AdminLoginView.as_view(), name="admin-login"),

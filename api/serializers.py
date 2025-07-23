@@ -727,3 +727,65 @@ class FichePaieDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = FichePaie
         fields = '__all__'
+
+from rest_framework import serializers
+from .models import Avoir, AvoirArticle
+
+class AvoirArticleSerializer(serializers.ModelSerializer):
+    total = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = AvoirArticle
+        fields = ['id', 'nom', 'prix', 'quantite', 'total']
+        
+    def validate_prix(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Le prix ne peut pas être négatif.")
+        return value
+    
+    def validate_quantite(self, value):
+        if value < 1:
+            raise serializers.ValidationError("La quantité doit être au moins 1.")
+        return value
+
+
+class AvoirSerializer(serializers.ModelSerializer):
+    articles = AvoirArticleSerializer(many=True, required=False)
+    
+    class Meta:
+        model = Avoir
+        fields = [
+            'id', 'numero', 'fournisseur', 'type_avoir', 'mode_paiement',
+            'montant_total', 'date_avoir', 'articles', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_montant_total(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Le montant total ne peut pas être négatif.")
+        return value
+    
+    def create(self, validated_data):
+        articles_data = validated_data.pop('articles', [])
+        avoir = Avoir.objects.create(**validated_data)
+        
+        for article_data in articles_data:
+            AvoirArticle.objects.create(avoir=avoir, **article_data)
+        
+        return avoir
+    
+    def update(self, instance, validated_data):
+        articles_data = validated_data.pop('articles', [])
+        
+        # Mettre à jour les champs de l'avoir
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Supprimer les anciens articles et créer les nouveaux
+        instance.articles.all().delete()
+        for article_data in articles_data:
+            AvoirArticle.objects.create(avoir=instance, **article_data)
+        
+        return instance
+
