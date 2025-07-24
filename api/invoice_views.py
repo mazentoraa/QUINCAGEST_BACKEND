@@ -54,6 +54,11 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
         if date_to:
             queryset = queryset.filter(date_emission__lte=date_to)
 
+        show_deleted = self.request.query_params.get("deleted")
+        if show_deleted == "true":
+            queryset = queryset.filter(is_deleted=True)
+        else:
+            queryset = queryset.filter(is_deleted=False)
         return queryset.prefetch_related(
             "travaux",
             "travaux__produit",
@@ -385,5 +390,121 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                 "status_summary": status_counts,
             }
         )
+    # Enhanced restore method with better error handling and debugging
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """
+        Restore a logically deleted invoice/commande
+        """
+        print(f"🔄 Attempting to restore Bons Découpe with ID: {pk}")
+        
+        try:
+            # First, let's check if the object exists at all (including deleted ones)
+            try:
+                commande = FactureTravaux.objects.get(pk=pk)
+                print(f"✅ Found Bons Découpe object: ID={commande.id}, is_deleted={commande.is_deleted}")
+            except FactureTravaux.DoesNotExist:
+                print(f"❌ No Bons Découpe object found with ID: {pk}")
+                # Let's see what IDs actually exist
+                existing_ids = list(FactureTravaux.objects.all().values_list('id', flat=True))
+                deleted_ids = list(FactureTravaux.objects.filter(is_deleted=True).values_list('id', flat=True))
+                print(f"📊 All existing Bons Découpe IDs: {existing_ids}")
+                print(f"🗑️ Deleted Bons Découpe IDs: {deleted_ids}")
+                
+                return Response(
+                    {
+                        "error": f"No Bons Découpe object found with ID {pk}",
+                        "existing_ids": existing_ids[:10],  # Show first 10 for debugging
+                        "deleted_ids": deleted_ids[:10],
+                        "total_records": len(existing_ids)
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Check if it's actually deleted
+            if not FactureTravaux.is_deleted:
+                print(f"⚠️ Warning: Bon Découpe {pk} is not marked as deleted (is_deleted={commande.is_deleted})")
+                return Response(
+                    {
+                        "error": f"Bon Découpe {pk} is not deleted and cannot be restored",
+                        "current_status": "active",
+                        "is_deleted": FactureTravaux.is_deleted
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Restore the record
+            instance = FactureTravaux.objects.get(pk=pk)
+            instance.is_deleted = False
+            instance.save()
+            
+            print(f"✅ Successfully restored Bon Découpe {pk}")
+            
+            return Response(
+                {
+                    "message": f"Bon Découpe {pk} restored successfully",
+                    "id": instance.id,
+                    "numero_facture": getattr(instance, 'numero_facture', None),
+                    "client_id": getattr(instance.client, 'client_id', None) if hasattr(instance, 'client') and instance.client else None,
+                    "is_deleted": instance.is_deleted
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Exception as e:
+            print(f"❌ Unexpected error in restore: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            return Response(
+                {
+                    "error": f"Unexpected error during restore: {str(e)}",
+                    "id_requested": pk
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    # Pour mettre en corbeille un bon de livraison découpe
+    @action(detail=True, methods=["post"])
+    def delete_logically(self, request, pk=None):
+        """
+        Soft delete a commande/invoice
+        """
+        print(f"🗑️ Attempting to soft delete Bon livraison découpe with ID: {pk}")
+        
+        try:
+            commande = self.get_object()
+            
+            if commande.is_deleted:
+                return Response(
+                    {"error": "This record is already deleted"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            commande.is_deleted = True
+            commande.save()
+            
+            print(f"✅ Successfully soft deleted bon découpe {pk}")
+            
+            return Response(
+                {
+                    "message": "Bon mis en corbeille.",
+                    "id": commande.id,
+                    "is_deleted": commande.is_deleted
+                }, 
+                status=status.HTTP_200_OK
+            )
+            
+        except FactureTravaux.DoesNotExist:
+            return Response(
+                {"error": f"Bon with ID {pk} not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"❌ Unexpected error in delete_logically: {str(e)}")
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
