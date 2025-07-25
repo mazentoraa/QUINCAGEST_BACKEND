@@ -24,7 +24,6 @@ class CdViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         show_deleted = self.request.query_params.get("deleted")
         nature = self.request.query_params.get("nature")
-
         qs = Cd.objects.all()
 
         if nature:
@@ -34,7 +33,6 @@ class CdViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_deleted=True)
         else:
             qs = qs.filter(is_deleted=False)
-
         return qs
 
     def get_serializer_class(self):
