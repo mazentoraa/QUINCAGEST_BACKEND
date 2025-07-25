@@ -854,7 +854,7 @@ class ProduitDevis(models.Model):
 class Devis(models.Model):
     """Model for client quotes (Devis)"""
 
-    STATUT_CHOICES = [
+    STATUT_CHOICES = [ 
         ("draft", "Brouillon"),
         ("sent", "Envoyé"),
         ("accepted", "Accepté"),
@@ -1351,6 +1351,10 @@ class Commande(models.Model):
         self.save(update_fields=["facture", "statut", "derniere_mise_a_jour"])
 
         return facture
+    def soft_delete(self):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_deleted", "deleted_at"])
 
 
 
@@ -2025,16 +2029,18 @@ class Livraison(models.Model):
         return f"{self.nom} x {self.quantite} (Bon {self.bon.numero or self.bon.id})"
 
 
+# models.py
 class Fournisseur(models.Model):
     nom = models.CharField(max_length=255)
     num_reg_fiscal = models.CharField(max_length=100, unique=True)
     adresse = models.CharField(max_length=500)
     telephone = models.CharField(max_length=20)
     infos_complementaires = models.TextField(blank=True, null=True)
+    is_deleted = models.BooleanField(default=False)  # Nouveau champ
+    deleted_at = models.DateTimeField(null=True, blank=True)  # Optionnel : date de suppression
 
     def __str__(self):
         return self.nom
-
 
 
 
