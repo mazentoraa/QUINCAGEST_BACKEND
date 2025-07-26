@@ -25,12 +25,22 @@ def get_all_traites():
     ).aggregate(total=Sum("montant"))["total"] or 0
     clients_trend = compute_trend(total_clients, total_clients_prev)
 
+    total_clients_encaissees = Traite.objects.filter(status='PAYEE').aggregate(total=Sum("montant"))["total"] or 0
+    total_clients_encaissees_prev = Traite.objects.filter(
+        date_echeance__range=(start_prev, end_prev), status='PAYEE'
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
     # -------- 2. Fournisseur traites
     total_fournisseurs = TraiteFournisseur.objects.aggregate(total=Sum("montant"))["total"] or 0
     total_fournisseurs_prev = TraiteFournisseur.objects.filter(
         date_echeance__range=(start_prev, end_prev)
     ).aggregate(total=Sum("montant"))["total"] or 0
     fournisseurs_trend = compute_trend(total_fournisseurs, total_fournisseurs_prev)
+
+    total_fournisseurs_payees = TraiteFournisseur.objects.filter(status='PAYEE').aggregate(total=Sum("montant"))["total"] or 0
+    total_fournisseurs_payees_prev = TraiteFournisseur.objects.filter(
+        date_echeance__range=(start_prev, end_prev), status='PAYEE'
+    ).aggregate(total=Sum("montant"))["total"] or 0
 
     # -------- 3. Echues
     echues_clients = Traite.objects.filter(date_echeance__lt=today, status="NON_PAYEE").aggregate(
@@ -54,8 +64,8 @@ def get_all_traites():
     echues_trend = compute_trend(echues_total, echues_prev)
 
     # -------- 4. Net
-    net = total_clients - total_fournisseurs
-    net_prev = total_clients_prev - total_fournisseurs_prev
+    net = total_clients_encaissees - total_fournisseurs_payees
+    net_prev = total_clients_encaissees_prev - total_fournisseurs_payees_prev
     net_trend = compute_trend(net, net_prev)
 
     # -------- 5. Build traites list (same as before)

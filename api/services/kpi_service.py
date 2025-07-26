@@ -1,7 +1,9 @@
 from django.db.models import Sum, F
+from datetime import date, timedelta    
 from django.utils.timezone import now
 from api.models import Avoir, Cd, Devis, Traite, TraiteFournisseur, Avance, FichePaie, Achat, FactureAchatMatiere, PlanTraiteFournisseur
 from api.utils.dates import get_week_range
+from api.services.schedule_service import get_schedule
 from decimal import Decimal
 
 def get_period_range(range_func, offset=0):
@@ -38,7 +40,7 @@ def compute_income(range_func, offset=0):
     print('Total factures client : ', cd_total)
     print('Total traites client : ', traite_total)
     print('Total remboursements avoirs : ', traite_total)
-    total_income = cd_total + traite_total + remb_total
+    total_income = Decimal(cd_total) + Decimal(traite_total) + Decimal(remb_total)
     return total_income
 
 def compute_expenses(start_date, end_date):
@@ -269,8 +271,151 @@ def compute_forecast_trend(current_balance, previous_balance, expected_income_va
 
     return round(current_forecast, 3), round(trend, 1)
 
+# Evolution de la Trésorerie
+def get_week_label(start_date):
+    return start_date.strftime("%d/%m")
 
-def compute_kpis():
+def get_treasury_evolution_weeks(evolution_weeks):
+    today = date.today()
+    treasury_balances = []
+    labels = []
+
+    # Number of weeks to include
+    def period_to_num_weeks(period: str) -> int:
+        if period == "90d":
+            return 13  
+        elif period == "1y":
+            return 52
+        return 4  # default: 30d = 4 weeks
+    num_weeks = period_to_num_weeks(evolution_weeks)
+
+    for week_offset in reversed(range(num_weeks)):
+        start_date, end_date = get_week_range(offset_weeks=-week_offset)
+
+        # Prepare range_func to pass to compute functions
+        def range_func(offset):
+            return get_week_range(offset_weeks=-offset)
+
+        # Manually compute date range for labels and compute_expenses
+        start_date, end_date = get_week_range(offset_weeks=-week_offset)
+
+        labels.append(get_week_label(start_date))
+        income = compute_income(range_func, offset=week_offset)
+        expenses = compute_expenses(start_date, end_date)
+
+        # Compute balance
+        balance = income - expenses
+
+        treasury_balances.append(balance)
+    # Format data for chart.js
+    treasury_chart_data = {
+        "labels": labels,
+        "datasets": [{
+            "label": "Solde de Trésorerie",
+            "data": treasury_balances,
+            "borderColor": "#10b981",
+            "backgroundColor": "rgba(16, 185, 129, 0.1)",
+            "borderWidth": 3,
+            "fill": True,
+            "tension": 0.4,
+            "pointBackgroundColor": "#10b981",
+            "pointBorderColor": "#ffffff",
+            "pointBorderWidth": 2,
+            "pointRadius": 6,
+        }]
+    }
+
+    return treasury_chart_data
+
+def get_total_transactions_count(range_func):
+    
+    def this_week_range_func(field):
+        start, end = range_func() # This week
+        return {f"{field}__range": (start, end)}
+    total = 0
+
+    total += Cd.objects.filter(**this_week_range_func("date_commande")).count()
+    total += Traite.objects.filter(**this_week_range_func("date_echeance")).count()
+    total += FactureAchatMatiere.objects.filter(**this_week_range_func("date_facture")).count()
+    total += TraiteFournisseur.objects.filter(**this_week_range_func("date_echeance")).count()
+    total += FichePaie.objects.filter(**this_week_range_func("date_creation")).count()
+    total += Avance.objects.filter(**this_week_range_func("date_demande")).count()
+
+    return total
+
+def get_taux_de_recouvrement(range_func):
+
+    def this_week_range_func(field):
+        start, end = range_func()
+        return {f"{field}__range": (start, end)}
+
+    # Total amount of client invoices issued (factures)
+    total_issued = Cd.objects.filter(**this_week_range_func("date_commande"), statut='completed', is_deleted=False).aggregate(
+        total=Sum("montant_ttc")
+    )["total"] or 0
+
+    # Total amount of payments received for client invoices (encaissements)
+    total_received = Cd.objects.filter(**this_week_range_func("date_commande"), is_deleted=False).aggregate(
+        total=Sum("montant_ttc")
+    )["total"] or 0
+
+    if total_issued == 0:
+        return 0.0  # Avoid division by zero
+
+    taux = (total_received / total_issued) * 100
+    return round(taux, 2)
+
+
+def generate_alerts(forecast, balance, expected_income, expected_expense):
+    alerts = []
+
+    schedule = get_schedule()
+
+    # ⚠️ Alert 1: Solde critique
+    if forecast < 5000:
+        alerts.append({
+            "type": "critical",
+            "title": "Solde critique prévu",
+            "description": f"Solde prévisionnel faible : {forecast} DT (seuil: 5,000 DT)",
+        })
+
+    # ⚠️ Alert 2: Solde net négatif
+    if balance < 0:
+        alerts.append({
+            "type": "danger",
+            "title": "Solde actuel négatif",
+            "description": f"Solde de trésorerie actuel est négatif : {balance} DT",
+        })
+
+    # ⚠️ Alert 3: Dépenses prévues supérieures aux recettes attendues
+    if expected_expense > expected_income:
+        delta = expected_expense - expected_income
+        alerts.append({
+            "type": "warning",
+            "title": "Dépenses prévues > Recettes attendues",
+            "description": f"Écart de {delta} DT entre les dépenses ({expected_expense}) et les recettes ({expected_income}) attendues.",
+        })
+
+    # ℹ️ Alert 4: Evénements à venir importants
+    for item in schedule:
+        amount = Decimal(item["amount"])
+        if amount < -10000:
+            alerts.append({
+                "type": "info",
+                "title": "Dépense importante à venir",
+                "description": f"{item['description']} le {item['date']} ({-amount} DT)",
+            })
+        elif amount > 10000:
+            alerts.append({
+                "type": "info",
+                "title": "Encaissement important prévu",
+                "description": f"{item['description']} le {item['date']} (+{amount} DT)",
+            })
+
+    return alerts
+
+
+def compute_kpis(evolution_weeks):
     """
     This function aggregates KPI values such as balance, income, expense, and forecast.
     """
@@ -300,4 +445,8 @@ def compute_kpis():
         "expected_income": {"value": expected_income_value, "trend": expected_income_trend, "positive": expected_income_trend >= 0},
         "expected_expense": {"value": expected_expenses_value, "trend": expected_expenses_trend, "positive": expected_expenses_trend >= 0},
         "forecast": {"value": forecast_value, "trend": forecast_trend, "positive": forecast_trend >= 0},
+        "treasury_chart_data": get_treasury_evolution_weeks(evolution_weeks),
+        "nb_transactions": get_total_transactions_count(get_week_range),
+        "taux_de_recouvrement": get_taux_de_recouvrement(get_week_range),
+        "alerts": generate_alerts(forecast_value, balance_value, expected_income_value, expected_expenses_value)
     }
