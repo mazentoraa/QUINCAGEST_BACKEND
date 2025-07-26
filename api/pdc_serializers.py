@@ -66,6 +66,7 @@ class CDetailSerializer(serializers.ModelSerializer):
             "date_livraison_reelle",
             "statut",
             "mode_paiement",
+            "mixte_comptant",
             "tax_rate",
             "montant_ht",
             "montant_tva",

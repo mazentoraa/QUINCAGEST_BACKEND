@@ -17,9 +17,17 @@ def compute_income(range_func, offset=0):
         model=Cd,
         date_field='date_commande',
         filters={'statut': 'completed', 'is_deleted': False},
-        exclude_filters={'mode_paiement': 'traite'}, # Mixte mode handling is skipped for now
+        exclude_filters={'mode_paiement__in': ['mixte', 'traite']}, 
         date_range=(start_date, end_date),
         aggregate_expression={'total': Sum('montant_ttc')}
+    )
+    # Facture client mode_paiement mixte partie comptant
+    cd_mixte_total = compute_total( 
+        model=Cd,
+        date_field='date_commande',
+        filters={'statut': 'completed', 'mode_paiement':'mixte','is_deleted': False},
+        date_range=(start_date, end_date),
+        aggregate_expression={'total': Sum('mixte_comptant')}
     )
     # Traites client
     traite_total = compute_total(
@@ -33,14 +41,15 @@ def compute_income(range_func, offset=0):
     remb_total = compute_total( 
         model=Avoir,
         date_field='date_avoir',
-        filters={'date_avoir__lt': now().date()},
+        filters={'date_avoir__lte': now().date()},
         date_range=(start_date, end_date),
         aggregate_expression={'total': Sum('montant_total')}
     )
     print('Total factures client : ', cd_total)
+    print('Total factures mixtes client : ', cd_mixte_total)
     print('Total traites client : ', traite_total)
     print('Total remboursements avoirs : ', traite_total)
-    total_income = Decimal(cd_total) + Decimal(traite_total) + Decimal(remb_total)
+    total_income = Decimal(cd_total) + Decimal(cd_mixte_total) + Decimal(traite_total) + Decimal(remb_total)
     return total_income
 
 def compute_expenses(start_date, end_date):
@@ -49,23 +58,19 @@ def compute_expenses(start_date, end_date):
     factures_payees_total = compute_total(
             model=FactureAchatMatiere,
             date_field='date_facture',
-            filters={'date_facture__lt': now().date()},
-            exclude_filters={'mode_paiement': 'traite'},
+            filters={'date_facture__lte': now().date()},
+            exclude_filters={'mode_paiement__in': ['mixte','traite']},
             date_range=(start_date, end_date),
             aggregate_expression={'total': Sum('prix_total')}
         )
-
-    # Paiement mixte part comptant = total - somme traites associées
-    factures_mixte = FactureAchatMatiere.objects.filter(
-        date_facture__range=(start_date, end_date),
-        mode_paiement='mixte'
-    )
-    total = 0
-    for facture in factures_mixte:
-        montant_total = facture.prix_total or 0
-        traite_total = PlanTraiteFournisseur.objects.filter(facture=facture).aggregate(total=Sum('montant_total'))['total'] or 0
-        total += montant_total - traite_total
-    paiement_mixte_total = total
+    # Factures fournisseurs réglées (mode_paiement == "mixte"), adding part comptant
+    paiement_mixte_total = compute_total(
+            model=FactureAchatMatiere,
+            date_field='date_facture',
+            filters={'date_facture__lte': now().date(), 'mode_paiement':'mixte'},
+            date_range=(start_date, end_date),
+            aggregate_expression={'total': Sum('mixte_comptant')}
+        )
 
     # 4. Traites fournisseurs payées
     traites_fournisseur_total = compute_total(
@@ -95,8 +100,8 @@ def compute_expenses(start_date, end_date):
         total += max(0, avance.montant - rembourse)
     avances_non_remboursees_total = total
     
-    print('Total factures payées: ', factures_payees_total)
-    print('Total paiement mixte: ', paiement_mixte_total)
+    print('Total factures fournisseur payées: ', factures_payees_total)
+    print('Total paiement fournisseur mixte: ', paiement_mixte_total)
     print('Total traites fournisseur: ', traites_fournisseur_total)
     print('Total salaires payés: ', salaires_payes_total)
     print('Total avances non remboursées: ', avances_non_remboursees_total)

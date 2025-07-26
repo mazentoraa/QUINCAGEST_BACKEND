@@ -314,7 +314,7 @@ class FactureAchatMatiereSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FactureAchatMatiere
-        fields = ['id', 'numero', 'fournisseur', 'type_achat','mode_paiement', 'prix_total', 'date_facture', 'achats']
+        fields = ['id', 'numero', 'fournisseur', 'type_achat','mode_paiement', 'mixte_comptant', 'prix_total', 'date_facture', 'achats']
 
     def create(self, validated_data):
         achats_data = validated_data.pop('achats', [])

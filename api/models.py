@@ -1705,10 +1705,12 @@ class Cd(models.Model):
             ("cheque", "Cheque"),
             ("virement", "Virement"),
             ("carte", "Carte"),
+            ("mixte", "Mixte"),
         ],
         default="cash",
         help_text="Payment method",
     )
+    mixte_comptant = models.IntegerField(default=0, help_text='Cash part for mode_paiement mixte')
     type_facture = models.CharField(default="", help_text="Product or Bon invoice")
     tax_rate = models.IntegerField(default=20, help_text="Tax rate percentage")
     montant_ht = models.FloatField(
@@ -1973,10 +1975,12 @@ class FactureAchatMatiere(models.Model):
             ("cheque", "Cheque"),
             ("virement", "Virement"),
             ("carte", "Carte"),
+            ("mixte", "Mixte"),
         ],
         default="cash",
         help_text="Payment method",
     )
+    mixte_comptant = models.IntegerField(default=0, help_text='Cash part for mode_paiement mixte')
     type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
 
     prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
