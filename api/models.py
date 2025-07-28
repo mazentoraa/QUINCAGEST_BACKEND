@@ -1643,7 +1643,7 @@ class Cd(models.Model):
         ("processing", "En cours de traitement"),
         ("completed", "Terminée"),
         ("cancelled", "Annulée"),
-        ("invoiced", "Facturée"),
+        # ("invoiced", "Facturée"),
     ]
 
     FACTURE_TYPES = (

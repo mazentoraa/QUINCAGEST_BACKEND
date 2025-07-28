@@ -9,8 +9,9 @@ from decimal import Decimal
 def get_period_range(range_func, offset=0):
     return range_func(offset)
 
-def compute_income(range_func, offset=0):
-    start_date, end_date = get_period_range(range_func, offset)
+def compute_income(range_func=None, offset=0, globally=False): # if globally is true we calculate the global income without a date range
+    if not globally:
+        start_date, end_date = get_period_range(range_func, offset)
 
     # Facture client payees
     cd_total = compute_total( 
@@ -18,7 +19,7 @@ def compute_income(range_func, offset=0):
         date_field='date_commande',
         filters={'statut': 'completed', 'is_deleted': False},
         exclude_filters={'mode_paiement__in': ['mixte', 'traite']}, 
-        date_range=(start_date, end_date),
+        date_range=None if globally else (start_date, end_date),
         aggregate_expression={'total': Sum('montant_ttc')}
     )
     # Facture client mode_paiement mixte partie comptant
@@ -26,7 +27,7 @@ def compute_income(range_func, offset=0):
         model=Cd,
         date_field='date_commande',
         filters={'statut': 'completed', 'mode_paiement':'mixte','is_deleted': False},
-        date_range=(start_date, end_date),
+        date_range=None if globally else (start_date, end_date),
         aggregate_expression={'total': Sum('mixte_comptant')}
     )
     # Traites client
@@ -34,7 +35,7 @@ def compute_income(range_func, offset=0):
         model=Traite,
         date_field='date_echeance',
         filters={'status': 'PAYEE'},
-        date_range=(start_date, end_date),
+        date_range=None if globally else (start_date, end_date),
         aggregate_expression={'total': Sum('montant')}
     )
     # Remboursement avoir fournisseur
@@ -42,7 +43,7 @@ def compute_income(range_func, offset=0):
         model=Avoir,
         date_field='date_avoir',
         filters={'date_avoir__lte': now().date()},
-        date_range=(start_date, end_date),
+        date_range=None if globally else (start_date, end_date),
         aggregate_expression={'total': Sum('montant_total')}
     )
     print('Total factures client : ', cd_total)
@@ -52,7 +53,7 @@ def compute_income(range_func, offset=0):
     total_income = Decimal(cd_total) + Decimal(cd_mixte_total) + Decimal(traite_total) + Decimal(remb_total)
     return total_income
 
-def compute_expenses(start_date, end_date):
+def compute_expenses(start_date=None, end_date=None, globally=False):
     
     # Factures fournisseurs réglées (mode_paiement != "traite")
     factures_payees_total = compute_total(
@@ -60,7 +61,7 @@ def compute_expenses(start_date, end_date):
             date_field='date_facture',
             filters={'date_facture__lte': now().date()},
             exclude_filters={'mode_paiement__in': ['mixte','traite']},
-            date_range=(start_date, end_date),
+            date_range=None if globally else (start_date, end_date),
             aggregate_expression={'total': Sum('prix_total')}
         )
     # Factures fournisseurs réglées (mode_paiement == "mixte"), adding part comptant
@@ -68,7 +69,7 @@ def compute_expenses(start_date, end_date):
             model=FactureAchatMatiere,
             date_field='date_facture',
             filters={'date_facture__lte': now().date(), 'mode_paiement':'mixte'},
-            date_range=(start_date, end_date),
+            date_range=None if globally else (start_date, end_date),
             aggregate_expression={'total': Sum('mixte_comptant')}
         )
 
@@ -77,7 +78,7 @@ def compute_expenses(start_date, end_date):
             model=TraiteFournisseur,
             date_field='date_echeance',
             filters={'status': 'PAYEE'},
-            date_range=(start_date, end_date),
+            date_range=None if globally else (start_date, end_date),
             aggregate_expression={'total': Sum('montant')}
         )
 
@@ -85,39 +86,51 @@ def compute_expenses(start_date, end_date):
     salaires_payes_total = compute_total(
             model=FichePaie,
             date_field='date_creation',
-            date_range=(start_date, end_date),
+            date_range=None if globally else (start_date, end_date),
             aggregate_expression={'total': Sum('net_a_payer')}
         )
 
     # 6. Avances versées non remboursées
-    avances = Avance.objects.filter(
-        date_demande__range=(start_date, end_date),
-        statut='Acceptée'
-    )
-    total = 0
-    for avance in avances:
-        rembourse = avance.remboursements.aggregate(r=Sum('montant'))['r'] or 0
-        total += max(0, avance.montant - rembourse)
-    avances_non_remboursees_total = total
+    # This will be revised latery
+    # avances = Avance.objects.filter(
+    #     date_demande__range=None if globally else (start_date, end_date),
+    #     statut='Acceptée' # progression == 100% : will be added after finishing partie employé
+    # )
+    # total = 0
+    # for avance in avances:
+    #     rembourse = avance.aggregate(r=Sum('montant'))['r'] or 0
+    #     total += max(0, avance.montant - rembourse)
+    # avances_non_remboursees_total = total
     
     print('Total factures fournisseur payées: ', factures_payees_total)
     print('Total paiement fournisseur mixte: ', paiement_mixte_total)
     print('Total traites fournisseur: ', traites_fournisseur_total)
     print('Total salaires payés: ', salaires_payes_total)
-    print('Total avances non remboursées: ', avances_non_remboursees_total)
+    # print('Total avances non remboursées: ', avances_non_remboursees_total)
 
     return (
-        Decimal(factures_payees_total) + Decimal(paiement_mixte_total) + Decimal(traites_fournisseur_total) + Decimal(salaires_payes_total) + Decimal(avances_non_remboursees_total)
+        Decimal(factures_payees_total) + Decimal(paiement_mixte_total) + Decimal(traites_fournisseur_total) + Decimal(salaires_payes_total) # + Decimal(avances_non_remboursees_total)
     )
+
 def compute_expected_income(start_date, end_date):
 
     # Factures clients non payées hors traite
     factures_non_payees = compute_total(
         model=Cd,
         date_field='date_commande',
-        filters={'is_deleted': False, 'nature':'facture', 'date_commande__gt': now().date()},
-        exclude_filters={'mode_paiement': 'traite', 'statut': 'completed'},
+        filters={'is_deleted': False, 'nature':'facture'},
+        exclude_filters={'mode_paiement__in': ['mixte','traite'], 'statut__in': ['cancelled','completed']},
         aggregate_expression={'total': Sum('montant_ttc')}
+    )
+
+    # Facture client mode_paiement mixte partie comptant
+    factures_non_payees_mixte = compute_total( 
+        model=Cd,
+        date_field='date_commande',
+        filters={'mode_paiement':'mixte','is_deleted': False},
+        date_range=(start_date, end_date),
+        exclude_filters={'statut__in': ['cancelled','completed']},
+        aggregate_expression={'total': Sum('mixte_comptant')}
     )
     
     # Traites clients non payées
@@ -128,32 +141,16 @@ def compute_expected_income(start_date, end_date):
         aggregate_expression={'total': Sum('montant')}
     )
 
-    # Devis acceptés
-    devis_acceptes = compute_total(
-        model=Devis,
-        date_field='date_emission',
-        filters={'statut': 'accepted'},
-        aggregate_expression={'total': Sum('montant_ttc')}
-    )
-
-    print('Total achats payés: ', factures_non_payees)
-    print('Total factures payées: ', traites_non_payees)
-    print('Total paiement mixte: ', devis_acceptes)
+    print('Total achats non payés: ', factures_non_payees)
+    print('Total achats mixtes : ', factures_non_payees_mixte)
+    print('Total traites non payées: ', traites_non_payees)
 
     return (
-        Decimal(factures_non_payees) + Decimal(traites_non_payees) + Decimal(devis_acceptes)
+        Decimal(factures_non_payees) + Decimal(factures_non_payees_mixte) + Decimal(traites_non_payees)
     )
 
 def compute_expected_expenses(start_date, end_date):
 
-    # Factures fournisseurs non payées
-    factures_fournisseur_non_payees = compute_total(
-        model=FactureAchatMatiere,
-        date_field='date_facture',
-        filters={'date_facture__gt': now().date()},
-        aggregate_expression={'total': Sum('prix_total')}
-    )
-    
     # Traites fournisseurs non payées
     traites_fournisseurs_non_payees = compute_total(
         model=TraiteFournisseur,
@@ -169,22 +166,12 @@ def compute_expected_expenses(start_date, end_date):
         filters={'statut': 'Générée'},
         aggregate_expression={'total': Sum('net_a_payer')}
     )
-    
-    #  Avances à verser
-    avances_a_verser = compute_total(
-        model=Avance,
-        date_field='date_demande',
-        filters={'statut': 'Acceptée'}, 
-        aggregate_expression={'total': Sum('montant')}
-    )
 
-    print('Total factures fournisseur non payés : ', factures_fournisseur_non_payees)
     print('Total traites fournisseurs non payées: ', traites_fournisseurs_non_payees)
     print('Total salaires à payer: ', salaires_a_payer)
-    print('Total avances à verser: ', avances_a_verser)
 
     return (
-        Decimal(factures_fournisseur_non_payees) + Decimal(traites_fournisseurs_non_payees) + Decimal(salaires_a_payer) + Decimal(avances_a_verser)
+        Decimal(traites_fournisseurs_non_payees) + Decimal(salaires_a_payer)
     )
 
 def compute_total(model, date_field, filters=None, exclude_filters=None, date_range=None, aggregate_expression=None):
@@ -200,6 +187,7 @@ def compute_total(model, date_field, filters=None, exclude_filters=None, date_ra
     return qs.aggregate(total=Sum('amount')).get('total') or 0
 
 def compute_income_trend(range_func):
+    global_income = compute_income(globally=True)
     curr_income = compute_income(range_func, offset=0)
     prev_income = compute_income(range_func, offset=1)  
 
@@ -208,18 +196,19 @@ def compute_income_trend(range_func):
     else:
         trend = ((curr_income - prev_income) / prev_income) * 100
 
-    return round(curr_income, 3), round(trend, 2), round(prev_income, 3)
+    return round(global_income, 3), round(trend, 2), round(prev_income, 3)
 
 def compute_expense_trend(range_func):
     curr_start, curr_end = range_func(0)
     prev_start, prev_end = range_func(1)
 
+    global_expense = compute_expenses(globally=True)
     curr_exp = compute_expenses(curr_start, curr_end)
     prev_exp = compute_expenses(prev_start, prev_end)
 
     trend = ((curr_exp - prev_exp) / prev_exp * 100) if prev_exp != 0 else (100 if curr_exp else 0)
 
-    return round(curr_exp, 3), round(trend, 2), round(prev_exp, 3)
+    return round(global_expense, 3), round(trend, 2), round(prev_exp, 3)
 
 def compute_expected_income_trend(range_func):
     curr_start, curr_end = range_func(0)

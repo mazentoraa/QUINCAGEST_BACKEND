@@ -49,6 +49,11 @@ def get_all_traites():
         total=Sum("montant"))["total"] or 0
     echues_total = echues_clients + echues_fournisseurs
 
+    # Counts
+    echues_clients_count = Traite.objects.filter(date_echeance__lt=today, status="NON_PAYEE").count()
+    echues_fournisseurs_count = TraiteFournisseur.objects.filter(date_echeance__lt=today, status="NON_PAYEE").count()
+    echues_count = echues_clients_count + echues_fournisseurs_count
+
     # Previous week echues
     echues_prev_clients = Traite.objects.filter(
         date_echeance__lt=start_curr,
@@ -68,16 +73,27 @@ def get_all_traites():
     net_prev = total_clients_encaissees_prev - total_fournisseurs_payees_prev
     net_trend = compute_trend(net, net_prev)
 
-    # -------- 5. Build traites list (same as before)
+
+    # -------- 5. Build traites list
+
+    def get_etat(t):
+        if t.status == "PAYEE":
+            return "paye"
+        elif t.date_echeance < today:
+            return "echu"
+        else:
+            return "en-cours"
+        
     client_data = [
         {
             "id": t.id,
             "type": "client",
-            "tier": t.plan_traite.client.nom_raison_sociale if t.plan_traite.client else t.plan_traite.nom_raison_sociale,
+            "tier": t.plan_traite.client.nom_client if t.plan_traite.client else t.plan_traite.nom_raison_sociale,
             "ref": t.plan_traite.numero_facture,
             "echeance": t.date_echeance,
             "montant": t.montant,
-            "statut": t.status
+            "statut": t.status,
+            "etat": get_etat(t)
         }
         for t in Traite.objects.select_related("plan_traite__client").all()
     ]
@@ -90,7 +106,8 @@ def get_all_traites():
             "ref": t.plan_traite.numero_facture,
             "echeance": t.date_echeance,
             "montant": -t.montant,
-            "statut": t.status
+            "statut": t.status,
+            "etat": get_etat(t)
         }
         for t in TraiteFournisseur.objects.select_related("plan_traite__fournisseur").all()
     ]
@@ -110,7 +127,7 @@ def get_all_traites():
         },
         "echues": {
             "value": round(echues_total, 2),
-            "count": 0,
+            "count": echues_count,
             "trend": echues_trend
         },
         "net": {
