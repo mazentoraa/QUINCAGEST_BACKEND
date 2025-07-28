@@ -18,8 +18,15 @@ class CommandeViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing orders (commande)
     """
+    queryset = Commande.objects.all()
 
-    queryset = Commande.objects.all().order_by("-date_commande", "-numero_commande")
+    def get_queryset(self):
+        if self.action == "deleted":
+            return Commande.objects.filter(is_deleted=True).order_by("-deleted_at")
+        elif self.action == "restore":
+        # Inclure les commandes supprimées pour les restaurer
+            return Commande.objects.filter(is_deleted=True)
+        return Commande.objects.filter(is_deleted=False).order_by("-date_commande", "-numero_commande")
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -232,3 +239,23 @@ class CommandeViewSet(viewsets.ModelViewSet):
                 {"error": f"Client with ID {client_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+    @action(detail=False, methods=["get"])
+    def deleted(self, request):
+        commandes = Commande.objects.filter(is_deleted=True).order_by("-deleted_at")
+        serializer = CommandeListSerializer(commandes, many=True)
+        return Response(serializer.data)
+
+
+    @action(detail=True, methods=["post"], url_path="restore", url_name="restore")
+    def restore(self, request, pk=None):
+
+        commande = self.get_object()
+        commande.is_deleted = False
+        commande.deleted_at = None
+        commande.save(update_fields=["is_deleted", "deleted_at"])
+        return Response({"message": "Commande restaurée avec succès"})
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.soft_delete()
+        return Response({"message": "Commande déplacée à la corbeille"}, status=status.HTTP_204_NO_CONTENT)

@@ -510,3 +510,38 @@ class CdViewSet(viewsets.ModelViewSet):
                 "deleted": deleted_sample
             }
         })
+    
+    @action(detail=True, methods=["delete"])
+    def delete_permanently(self, request, pk=None):
+        """
+        Supprime définitivement une commande déjà supprimée logiquement.
+        """
+        try:
+            commande = Cd.objects.get(pk=pk)
+
+            if not commande.is_deleted:
+                return Response(
+                    {
+                        "error": "Cette commande n'est pas dans la corbeille. Veuillez d'abord la supprimer logiquement."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            commande.delete()
+
+            return Response(
+                {"message": f"La commande {pk} a été définitivement supprimée."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
+
+        except Cd.DoesNotExist:
+            return Response(
+                {"error": f"Aucune commande trouvée avec l'ID {pk}."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            print(f"❌ Erreur inattendue dans delete_permanently: {str(e)}")
+            return Response(
+                {"error": f"Erreur serveur: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -18,8 +18,17 @@ class DevisViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing quotes (devis)
     """
+    queryset = Devis.objects.all()          
+    def get_queryset(self):
+        if self.action == "deleted":
+            return Devis.objects.filter(is_deleted=True).order_by("-date_emission")
+        # Pour l'action restore, on veut bien récupérer le devis supprimé aussi
+        elif self.action == "restore":
+            # Inclure devis supprimés
+            return Devis.objects.all()
+        else:
+            return Devis.objects.filter(is_deleted=False).order_by("-date_emission", "-numero_devis")
 
-    queryset = Devis.objects.all().order_by("-date_emission", "-numero_devis")
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -176,3 +185,23 @@ class DevisViewSet(viewsets.ModelViewSet):
                 {"error": f"Client with ID {client_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+    def destroy(self, request, *args, **kwargs):
+        devis = self.get_object()
+        devis.is_deleted = True
+        devis.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"])
+    def deleted(self, request):
+        devis = Devis.objects.filter(is_deleted=True).order_by("-date_emission")
+        serializer = DevisListSerializer(devis, many=True)
+        return Response(serializer.data)
+
+
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        devis = self.get_object()
+        devis.is_deleted = False
+        devis.save()
+        return Response({"success": "Devis restauré avec succès."}, status=status.HTTP_200_OK)

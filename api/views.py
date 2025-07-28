@@ -310,16 +310,24 @@ class ClientViewSet(viewsets.ModelViewSet):
             )
         return super().update(request, *args, **kwargs)
 
+from django.utils import timezone
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework import status
+
 class ProduitViewSet(viewsets.ModelViewSet):
     """
     API pour la gestion des produits.
-
+    
     Liste tous les produits, crée de nouveaux produits, et modifie ou supprime les produits existants.
     """
-
+    queryset = Produit.objects.all()
     permission_classes = [IsAdminUser]
-    queryset = Produit.objects.all().order_by("-id")
     serializer_class = ProduitSerializer
+    
+    def get_queryset(self):
+        """Override to exclude deleted products by default"""
+        return Produit.objects.filter(is_deleted=False).order_by("-id")
 
     @swagger_auto_schema(
         operation_description="Créer un nouveau produit",
@@ -335,7 +343,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
                 {"message": "Le nom du produit est obligatoire"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
         return super().create(request, *args, **kwargs)
 
     @swagger_auto_schema(
@@ -352,8 +360,100 @@ class ProduitViewSet(viewsets.ModelViewSet):
                 {"message": "Le nom du produit est obligatoire"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        
         return super().update(request, *args, **kwargs)
+
+    @swagger_auto_schema(
+        operation_description="Supprimer logiquement un produit (soft delete)",
+        responses={204: "Produit supprimé avec succès"},
+    )
+    def destroy(self, request, *args, **kwargs):
+        """
+        Soft delete a product instead of hard delete
+        """
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.deleted_at = timezone.now()
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @swagger_auto_schema(
+        operation_description="Récupérer les produits supprimés (corbeille)",
+        responses={200: ProduitSerializer(many=True)},
+    )
+    @action(detail=False, methods=["get"])
+    def trash(self, request):
+        """
+        Get all deleted products (trash/recycle bin)
+        """
+        deleted_products = Produit.objects.filter(is_deleted=True).order_by("-deleted_at")
+        serializer = self.get_serializer(deleted_products, many=True)
+        return Response(serializer.data)
+
+    @swagger_auto_schema(
+        operation_description="Restaurer un produit supprimé",
+        responses={200: ProduitSerializer, 404: "Produit non trouvé"},
+    )
+    @action(detail=True, methods=["post"])
+    def restore(self, request, pk=None):
+        """
+        Restore a deleted product
+        """
+        try:
+            # Get the product even if it's deleted
+            product = Produit.objects.get(pk=pk, is_deleted=True)
+            product.is_deleted = False
+            product.deleted_at = None
+            product.save()
+            
+            serializer = self.get_serializer(product)
+            return Response({
+                "message": "Produit restauré avec succès",
+                "product": serializer.data
+            })
+        except Produit.DoesNotExist:
+            return Response(
+                {"message": "Produit supprimé non trouvé"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Supprimer définitivement un produit de la corbeille",
+        responses={204: "Produit supprimé définitivement"},
+    )
+    @action(detail=True, methods=["delete"])
+    def permanent_delete(self, request, pk=None):
+        """
+        Permanently delete a product from trash
+        """
+        try:
+            product = Produit.objects.get(pk=pk, is_deleted=True)
+            product.delete()  # Hard delete
+            return Response(
+                {"message": "Produit supprimé définitivement"},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Produit.DoesNotExist:
+            return Response(
+                {"message": "Produit supprimé non trouvé"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+    @swagger_auto_schema(
+        operation_description="Vider complètement la corbeille",
+        responses={200: "Corbeille vidée avec succès"},
+    )
+    @action(detail=False, methods=["delete"])
+    def empty_trash(self, request):
+        """
+        Empty the entire trash (permanent delete all deleted products)
+        """
+        deleted_count = Produit.objects.filter(is_deleted=True).count()
+        Produit.objects.filter(is_deleted=True).delete()
+        
+        return Response({
+            "message": f"{deleted_count} produits supprimés définitivement de la corbeille"
+        })
 
     @swagger_auto_schema(
         operation_description="Récupérer les produits filtrés par type de matière",
@@ -382,11 +482,10 @@ class ProduitViewSet(viewsets.ModelViewSet):
                 {"message": "Le paramètre type_matiere est obligatoire"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        products = self.queryset.filter(type_matiere=type_matiere)
+        
+        products = self.get_queryset().filter(type_matiere=type_matiere)
         serializer = self.get_serializer(products, many=True)
         return Response(serializer.data)
-
 
 class AdminLoginView(APIView):
     """
@@ -611,12 +710,54 @@ class BonLivraisonMatiereViewSet(viewsets.ModelViewSet):
 from .models import Fournisseur
 from .serializers import FournisseurSerializer
 
+# views.py
+from django.utils import timezone
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
 class FournisseurViewSet(viewsets.ModelViewSet):
-    queryset = Fournisseur.objects.all()
     serializer_class = FournisseurSerializer
     
-
-
+    def get_queryset(self):
+        # Par défaut, ne montrer que les fournisseurs non supprimés
+        return Fournisseur.objects.filter(is_deleted=False)
+    
+    def destroy(self, request, *args, **kwargs):
+        # Suppression logique au lieu de suppression physique
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.deleted_at = timezone.now()
+        instance.save()
+        return Response(status=204)
+    
+    @action(detail=False, methods=['get'])
+    def trash(self, request):
+        # Récupérer les fournisseurs supprimés
+        deleted_fournisseurs = Fournisseur.objects.filter(is_deleted=True)
+        serializer = self.get_serializer(deleted_fournisseurs, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        # Restaurer un fournisseur
+        try:
+            fournisseur = Fournisseur.objects.get(pk=pk, is_deleted=True)
+            fournisseur.is_deleted = False
+            fournisseur.deleted_at = None
+            fournisseur.save()
+            return Response({'message': 'Fournisseur restauré avec succès'})
+        except Fournisseur.DoesNotExist:
+            return Response({'error': 'Fournisseur non trouvé'}, status=404)
+    
+    @action(detail=True, methods=['delete'])
+    def permanent_delete(self, request, pk=None):
+        # Suppression définitive
+        try:
+            fournisseur = Fournisseur.objects.get(pk=pk, is_deleted=True)
+            fournisseur.delete()
+            return Response({'message': 'Fournisseur supprimé définitivement'})
+        except Fournisseur.DoesNotExist:
+            return Response({'error': 'Fournisseur non trouvé'}, status=404)
 
 from .models import Consommable
 from .serializers import ConsommableSerializer
