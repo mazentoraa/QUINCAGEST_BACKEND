@@ -1,9 +1,10 @@
 from django.db.models import Sum, F
-from datetime import date, timedelta    
+from datetime import date, timedelta, datetime
 from django.utils.timezone import now
 from api.models import Avoir, Cd, Devis, Traite, TraiteFournisseur, Avance, FichePaie, Achat, FactureAchatMatiere, PlanTraiteFournisseur
 from api.utils.dates import get_week_range
 from api.services.schedule_service import get_schedule
+from .traite_service import get_all_traites
 from decimal import Decimal
 
 def get_period_range(range_func, offset=0):
@@ -196,7 +197,7 @@ def compute_income_trend(range_func):
     else:
         trend = ((curr_income - prev_income) / prev_income) * 100
 
-    return round(global_income, 3), round(trend, 2), round(prev_income, 3)
+    return round(global_income, 3), round(curr_income, 3), round(trend, 2), round(prev_income, 3)
 
 def compute_expense_trend(range_func):
     curr_start, curr_end = range_func(0)
@@ -208,7 +209,7 @@ def compute_expense_trend(range_func):
 
     trend = ((curr_exp - prev_exp) / prev_exp * 100) if prev_exp != 0 else (100 if curr_exp else 0)
 
-    return round(global_expense, 3), round(trend, 2), round(prev_exp, 3)
+    return round(global_expense, 3), round(curr_exp, 3), round(trend, 2), round(prev_exp, 3)
 
 def compute_expected_income_trend(range_func):
     curr_start, curr_end = range_func(0)
@@ -232,14 +233,16 @@ def compute_expected_expenses_trend(range_func):
 
     return round(curr_expected_income, 3), round(trend, 2), round(prev_expected_income, 3)
 
-def compute_balance_trend(income_value, expense_value):
+def compute_balance_trend(global_income, global_expenses, income_value, expense_value):
+    # Global balance
+    global_balance = Decimal(global_income) - Decimal(global_expenses)
+
     # Current balance
     current_balance = Decimal(income_value) - Decimal(expense_value)
 
     # Previous period
-    prev_income = compute_income(get_week_range, offset=1)
-
     prev_start, prev_end = get_week_range(1)
+    prev_income = compute_income(get_week_range, offset=1)
     prev_expense = compute_expenses(prev_start, prev_end)
 
     # Previous balance
@@ -251,7 +254,7 @@ def compute_balance_trend(income_value, expense_value):
     else:
         trend = ((current_balance - previous_balance) / previous_balance) * 100
 
-    return round(current_balance, 3), round(trend, 1), round(previous_balance, 3)
+    return round(global_balance, 3), round(current_balance, 3), round(trend, 1), round(previous_balance, 3)
 
 # Solde prévisionnel
 def compute_forecast_trend(current_balance, previous_balance, expected_income_value, previous_expected_income, expected_expenses_value, previous_expected_expenses):
@@ -321,6 +324,23 @@ def get_treasury_evolution_weeks(evolution_weeks):
 
     return treasury_chart_data
 
+# Expected balance
+def get_expected_balance_evolution(expected_income, expected_expenses):
+    # Get the label for the current week
+    start_date, _ = get_week_range(offset_weeks=0)
+    current_week_label = get_week_label(start_date)
+
+    # Compute expected balance for this week
+    expected_balance = expected_income - expected_expenses
+    print("eeeeeeeeeeeeeeeeeeeeeeeeeeeeee", expected_balance)
+    return {
+            "week": current_week_label,
+            "expected_balance": expected_balance
+    }
+    
+
+
+
 def get_total_transactions_count(range_func):
     
     def this_week_range_func(field):
@@ -364,8 +384,10 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
     alerts = []
 
     schedule = get_schedule()
+    all_traites_data = get_all_traites()
+    traites = all_traites_data["traites"]
 
-    # ⚠️ Alert 1: Solde critique
+    # Alert 1: Solde critique
     if forecast < 5000:
         alerts.append({
             "type": "critical",
@@ -373,7 +395,7 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
             "description": f"Solde prévisionnel faible : {forecast} DT (seuil: 5,000 DT)",
         })
 
-    # ⚠️ Alert 2: Solde net négatif
+    # Alert 2: Solde net négatif
     if balance < 0:
         alerts.append({
             "type": "danger",
@@ -381,7 +403,7 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
             "description": f"Solde de trésorerie actuel est négatif : {balance} DT",
         })
 
-    # ⚠️ Alert 3: Dépenses prévues supérieures aux recettes attendues
+    # Alert 3: Dépenses prévues supérieures aux recettes attendues
     if expected_expense > expected_income:
         delta = expected_expense - expected_income
         alerts.append({
@@ -390,7 +412,7 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
             "description": f"Écart de {delta} DT entre les dépenses ({expected_expense}) et les recettes ({expected_income}) attendues.",
         })
 
-    # ℹ️ Alert 4: Evénements à venir importants
+    # Alert 4: Evénements à venir importants
     for item in schedule:
         amount = Decimal(item["amount"])
         if amount < -10000:
@@ -406,6 +428,30 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
                 "description": f"{item['description']} le {item['date']} (+{amount} DT)",
             })
 
+    # Alert 5: Traitements en retard
+    traites_en_retard = [t for t in traites if t["etat"] == "echu" and t["statut"] != "payé"]
+    if traites_en_retard:
+        alerts.append({
+            "type": "danger",
+            "title": "Traites en retard",
+            "description": f"{len(traites_en_retard)} traite(s) sont échues et non payées."
+        })
+
+        # Alert 6: Traitements en cours bientôt échues
+    today = datetime.today().date()
+    soon = today + timedelta(days=7)
+    en_cours_bientot_echues = [
+        t for t in traites
+        if t["etat"] == "en-cours" and today <= t["echeance"] <= soon
+    ]
+    if en_cours_bientot_echues:
+        alerts.append({
+            "type": "warning",
+            "title": "Traitements bientôt échus",
+            "description": f"{len(en_cours_bientot_echues)} traite(s) en cours échues dans moins de 7 jours.",
+        })
+
+
     return alerts
 
 
@@ -413,15 +459,15 @@ def compute_kpis(evolution_weeks):
     """
     This function aggregates KPI values such as balance, income, expense, and forecast.
     """
-    income_value, income_trend, previous_income = compute_income_trend(get_week_range)
-    print('Income value: ', income_value, ' | Income trend: ', income_trend)
+    global_income, income_value, income_trend, previous_income = compute_income_trend(get_week_range)
+    print('Global expenses: ', global_income, ' Income value: ', income_value, ' | Income trend: ', income_trend)
     
 
-    expenses_value, expenses_trend, previous_expenses = compute_expense_trend(get_week_range)
-    print('Expenses value: ', expenses_value, ' | Expenses trend: ', expenses_trend)
+    global_expenses, expenses_value, expenses_trend, previous_expenses = compute_expense_trend(get_week_range)
+    print('Global expenses: ', global_expenses, 'Expenses value: ', expenses_value, ' | Expenses trend: ', expenses_trend)
 
-    balance_value, balance_trend, previous_balance = compute_balance_trend(income_value, expenses_value)
-    print('Balance value: ', balance_value, ' | Balance trend: ', balance_trend)
+    global_balance, balance_value, balance_trend, previous_balance = compute_balance_trend(global_income, global_expenses, income_value, expenses_value)
+    print('Global expenses: ', global_expenses, ' Balance value: ', balance_value, ' | Balance trend: ', balance_trend)
 
     expected_expenses_value, expected_expenses_trend, previous_expected_expenses = compute_expected_expenses_trend(get_week_range)
     print('Expected income value: ', expected_expenses_value, ' | Income trend: ', expected_expenses_trend)
@@ -436,9 +482,13 @@ def compute_kpis(evolution_weeks):
         "balance": {"value": balance_value, "trend": balance_trend, "positive": balance_value >= 0},
         "income": {"value": income_value, "trend": income_trend, "positive": income_trend >= 0},
         "expense": {"value": expenses_value, "trend": expenses_trend, "positive": False},
+        "global_balance": {"value": global_balance, "trend": balance_trend, "positive": global_balance >= 0},
+        "global_income": {"value": global_income, "trend": income_trend, "positive": income_trend >= 0},
+        "global_expense": {"value": global_expenses, "trend": expenses_trend, "positive": False},
+        "forecast": {"value": forecast_value, "trend": forecast_trend, "positive": forecast_trend >= 0},
         "expected_income": {"value": expected_income_value, "trend": expected_income_trend, "positive": expected_income_trend >= 0},
         "expected_expense": {"value": expected_expenses_value, "trend": expected_expenses_trend, "positive": expected_expenses_trend >= 0},
-        "forecast": {"value": forecast_value, "trend": forecast_trend, "positive": forecast_trend >= 0},
+        "expected_balance_evolution": get_expected_balance_evolution(expected_income_value, expected_expenses_value),
         "treasury_chart_data": get_treasury_evolution_weeks(evolution_weeks),
         "nb_transactions": get_total_transactions_count(get_week_range),
         "taux_de_recouvrement": get_taux_de_recouvrement(get_week_range),
