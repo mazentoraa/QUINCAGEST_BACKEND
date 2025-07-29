@@ -1208,7 +1208,8 @@ class KPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        data = compute_kpis()
+        evolution_weeks = request.GET.get("evolution_weeks", "30d")
+        data = compute_kpis(evolution_weeks)
         return Response(data)
 
 class ScheduleView(APIView):

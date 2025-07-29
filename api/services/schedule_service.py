@@ -1,6 +1,6 @@
 from datetime import date
 from django.utils.timezone import now
-from api.models import Cd, TraiteFournisseur
+from api.models import Cd, TraiteFournisseur, FichePaie, Traite
 
 
 def get_schedule():
@@ -28,20 +28,33 @@ def get_schedule():
     for t in traites:
         upcoming_events.append({
             'date': t.date_echeance.isoformat(),
-            'description': f"Traite {t.plan_traite.fournisseur.nom}",
+            'description': f"Traite Fournisseur {t.plan_traite.fournisseur.nom}",
             'amount': -t.montant,
             'type': 'supplier'
         })
+    
+    # 2. Upcoming client traites
+    traites = Traite.objects.filter(
+        status='NON_PAYEE',
+        date_echeance__gte=today
+    )
+    for t in traites:
+        upcoming_events.append({
+            'date': t.date_echeance.isoformat(),
+            'description': f"Traite Client {t.plan_traite.client.nom_client}",
+            'amount': t.montant,
+            'type': 'positive'
+        })
 
-    # salaries (After finishing module employé)
-    # salaries = Salary.objects.filter(date__gte=today)
-    # for s in salaries:
-    #     upcoming_events.append({
-    #         'date': s.date.isoformat(),
-    #         'description': "Salaire employé",
-    #         'amount': -s.amount,
-    #         'type': 'negative'
-    #     })
+    # Salaries
+    salaries = FichePaie.objects.filter(date_creation__gte=today)
+    for s in salaries:
+        upcoming_events.append({
+            'date': s.date_creation.strftime("%Y-%m-%d"),
+            'description': f"Salaire employé {s.employe.nom}",
+            'amount': -s.net_a_payer,
+            'type': 'negative'
+        })
 
     # 4. Sort by date
     upcoming_events.sort(key=lambda x: x['date'])
