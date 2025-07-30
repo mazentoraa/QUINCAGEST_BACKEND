@@ -3,19 +3,31 @@ from django.utils.timezone import now
 from api.models import Cd, TraiteFournisseur, FichePaie, Traite
 
 
-def get_schedule():
+def get_schedule(end_date=None):
     today = date.today()
     upcoming_events = []
+
+    # Date filter
+    if end_date:
+        cd_filter = {'date_commande__range': (today, end_date)}
+        traite_filter = {'date_echeance__range': (today, end_date)}
+        salaire_filter = {'date_paiement__range': (today, end_date)}
+    else:
+        cd_filter = {'date_commande__gte': today}
+        traite_filter = {'date_echeance__gte': today}
+        salaire_filter = {'date_paiement__gte': today}
+
 
     # 1. Upcoming client invoices
     invoices = Cd.objects.filter(
         statut='pending',
-        date_commande__gte=today
+        is_deleted=False,
+        **cd_filter
     )
     for inv in invoices:
         upcoming_events.append({
             'date': inv.date_commande.isoformat(),
-            'description': f"Encaissement {inv.client.nom_client}",
+            'description': f"Facture Client {inv.client.nom_client}",
             'amount': inv.montant_ttc,
             'type': 'positive'
         })
@@ -23,7 +35,8 @@ def get_schedule():
     # 2. Upcoming supplier traites
     traites = TraiteFournisseur.objects.filter(
         status='NON_PAYEE',
-        date_echeance__gte=today
+        plan_traite__is_deleted=False,
+        **traite_filter
     )
     for t in traites:
         upcoming_events.append({
@@ -33,10 +46,11 @@ def get_schedule():
             'type': 'supplier'
         })
     
-    # 2. Upcoming client traites
+    # 3. Upcoming client traites
     traites = Traite.objects.filter(
+        plan_traite__is_deleted=False,
         status='NON_PAYEE',
-        date_echeance__gte=today
+        **traite_filter
     )
     for t in traites:
         upcoming_events.append({
@@ -47,10 +61,10 @@ def get_schedule():
         })
 
     # Salaries
-    salaries = FichePaie.objects.filter(date_creation__gte=today)
+    salaries = FichePaie.objects.filter(**salaire_filter)
     for s in salaries:
         upcoming_events.append({
-            'date': s.date_creation.strftime("%Y-%m-%d"),
+            'date': s.date_paiement.strftime("%Y-%m-%d"),
             'description': f"Salaire employé {s.employe.nom}",
             'amount': -s.net_a_payer,
             'type': 'negative'

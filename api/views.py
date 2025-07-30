@@ -2,6 +2,7 @@ from django.forms import ValidationError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from datetime import date, timedelta
 from django.db.models import Q
 from .models import Client, Traveaux, Produit, Matiere, MatiereUsage,Entreprise
 from .serializers import (
@@ -1133,11 +1134,16 @@ from .services.traite_service import get_all_traites
 from .services.period_service import (compute_encaissement_trend, compute_decaissement_trend, compute_resultat_net_trend, compute_traites_fournisseurs_trend, compute_traites_clients_trend, compute_echues_total_and_count_with_trend)
 from .services.chart_data import compute_chart_data
 from .utils.dates import get_period_range
+from .services.kpi_service import compute_kpis
+from .services.traite_service import get_all_traites
 
 class PeriodView(APIView):
     def get(self, request):
         period = request.query_params.get("period", "week")
-        start_date, end_date, label = get_period_range(period)
+        range_func, label = get_period_range(period)
+        start_date, end_date = range_func()
+        kpiData = compute_kpis(evolution_weeks=4, range_func=range_func)
+        traites = get_all_traites(range_func=range_func, globally=False)
 
         period_labels = {
             "week": "Cette semaine",
@@ -1147,13 +1153,21 @@ class PeriodView(APIView):
         }
         label = period_labels.get(period, "Cette période")
 
-        income, income_trend = compute_encaissement_trend(start_date, end_date)
-        expense, expense_trend = compute_decaissement_trend(start_date, end_date)
-        net, net_trend = compute_resultat_net_trend(start_date, end_date)
-        traites_fournisseurs, traites_trend = compute_traites_fournisseurs_trend(start_date, end_date)
-        traites_clients, traites_clients_trend = compute_traites_clients_trend(start_date, end_date)
-        echues_total, echues_count, echues_trend = compute_echues_total_and_count_with_trend(start_date, end_date)
+        income, income_trend = kpiData["income"]["value"], kpiData["income"]["trend"]
+        expense, expense_trend =  kpiData["expense"]["value"],  kpiData["income"]["trend"]
+        net, net_trend =  kpiData["balance"]["value"],  kpiData["balance"]["trend"]
+        traites_fournisseurs, traites_trend = [t for t in traites["traites"] if t["type"] == "fournisseur"], traites["stats"]["fournisseurs"]["trend"]
+        traites_clients, traites_clients_trend = [t for t in traites["traites"] if t["type"] == "client"], traites["stats"]["clients"]["trend"]
+        echues_total, echues_count, echues_trend = [t for t in traites["traites"] if t["etat"] == "echu"], traites["stats"]["echues"]["trend"], traites["stats"]["echues"]["count"]
         chart_data = compute_chart_data(start_date, end_date, label, period)
+
+        # income, income_trend = compute_encaissement_trend(start_date, end_date)
+        # expense, expense_trend = compute_decaissement_trend(start_date, end_date)
+        # net, net_trend = compute_resultat_net_trend(start_date, end_date)
+        # traites_fournisseurs, traites_trend = compute_traites_fournisseurs_trend(start_date, end_date)
+        # traites_clients, traites_clients_trend = compute_traites_clients_trend(start_date, end_date)
+        # echues_total, echues_count, echues_trend = compute_echues_total_and_count_with_trend(start_date, end_date)
+        # chart_data = compute_chart_data(start_date, end_date, label, period)
 
         return Response({
             "encaissements": {
@@ -1175,7 +1189,7 @@ class PeriodView(APIView):
                 "label": label
             },
             "traitesFournisseurs": {
-                "value": -traites_fournisseurs,
+                "value": traites_fournisseurs,
                 "trend": -traites_trend,
                 "positive": False,
                 "label": label
@@ -1216,7 +1230,8 @@ class ScheduleView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        data = get_schedule()
+        end_date = date.today() + timedelta(days=7)
+        data = get_schedule(end_date=end_date)
         return Response(data)
 
 def create(self, request, *args, **kwargs):

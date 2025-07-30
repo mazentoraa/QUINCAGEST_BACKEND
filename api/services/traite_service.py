@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from api.models import Traite, TraiteFournisseur
 
 def compute_trend(current, previous):
@@ -13,60 +13,103 @@ def get_week_range(weeks_ago=0):
     end = start + timedelta(days=6)
     return start, end
 
-def get_all_traites():
+def get_all_traites(range_func = None, globally=True):
     today = date.today()
-    start_curr, end_curr = get_week_range(0)
+    if not range_func:
+        range_func = get_week_range(0)
+        start_date, end_date = range_func
+    else:
+        start_date, end_date = range_func()
+    
     start_prev, end_prev = get_week_range(1)
 
     # -------- 1. Clients traites
-    total_clients = Traite.objects.filter(plan_traite__is_deleted = False).aggregate(total=Sum("montant"))["total"] or 0
+    total_clients = Traite.objects.filter(
+        Q(plan_traite__is_deleted = False), 
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).aggregate(total=Sum("montant"))["total"] or 0
+    
     total_clients_prev = Traite.objects.filter(
         date_echeance__range=(start_prev, end_prev),
         plan_traite__is_deleted = False
     ).aggregate(total=Sum("montant"))["total"] or 0
     clients_trend = compute_trend(total_clients, total_clients_prev)
 
-    total_clients_encaissees = Traite.objects.filter(status='PAYEE', plan_traite__is_deleted = False).aggregate(total=Sum("montant"))["total"] or 0
+    total_clients_encaissees = Traite.objects.filter(
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+        Q(status='PAYEE'), 
+        Q(plan_traite__is_deleted = False)
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
     total_clients_encaissees_prev = Traite.objects.filter(
         date_echeance__range=(start_prev, end_prev), status='PAYEE',
         plan_traite__is_deleted = False
     ).aggregate(total=Sum("montant"))["total"] or 0
 
     # -------- 2. Fournisseur traites
-    total_fournisseurs = TraiteFournisseur.objects.filter(plan_traite__is_deleted = False).aggregate(total=Sum("montant"))["total"] or 0
+    total_fournisseurs = TraiteFournisseur.objects.filter(
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
     total_fournisseurs_prev = TraiteFournisseur.objects.filter(
         date_echeance__range=(start_prev, end_prev),
         plan_traite__is_deleted = False
     ).aggregate(total=Sum("montant"))["total"] or 0
     fournisseurs_trend = compute_trend(total_fournisseurs, total_fournisseurs_prev)
 
-    total_fournisseurs_payees = TraiteFournisseur.objects.filter(status='PAYEE', plan_traite__is_deleted = False).aggregate(total=Sum("montant"))["total"] or 0
+    total_fournisseurs_payees = TraiteFournisseur.objects.filter(
+        Q(status='PAYEE'),
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
     total_fournisseurs_payees_prev = TraiteFournisseur.objects.filter(
         date_echeance__range=(start_prev, end_prev), status='PAYEE',
         plan_traite__is_deleted = False
     ).aggregate(total=Sum("montant"))["total"] or 0
 
     # -------- 3. Echues
-    echues_clients = Traite.objects.filter(date_echeance__lt=today, status="NON_PAYEE", plan_traite__is_deleted = False).aggregate(
-        total=Sum("montant"))["total"] or 0
-    echues_fournisseurs = TraiteFournisseur.objects.filter(date_echeance__lt=today, status="NON_PAYEE", plan_traite__is_deleted = False).aggregate(
-        total=Sum("montant"))["total"] or 0
+    echues_clients = Traite.objects.filter(
+        Q(date_echeance__lt=today), 
+        Q(status="NON_PAYEE"), 
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
+    echues_fournisseurs = TraiteFournisseur.objects.filter(
+        Q(date_echeance__lt=today), 
+        Q(status="NON_PAYEE"), 
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).aggregate(total=Sum("montant"))["total"] or 0
+
     echues_total = echues_clients + echues_fournisseurs
 
     # Counts
-    echues_clients_count = Traite.objects.filter(date_echeance__lt=today, status="NON_PAYEE", plan_traite__is_deleted = False).count()
-    echues_fournisseurs_count = TraiteFournisseur.objects.filter(date_echeance__lt=today, status="NON_PAYEE", plan_traite__is_deleted = False).count()
+    echues_clients_count = Traite.objects.filter(
+        Q(date_echeance__lt=today), 
+        Q(status="NON_PAYEE"), 
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).count()
+    echues_fournisseurs_count = TraiteFournisseur.objects.filter(
+        Q(date_echeance__lt=today), 
+        Q(status="NON_PAYEE"), 
+        Q(plan_traite__is_deleted = False),
+        Q(date_echeance__range=(start_date, end_date)) if not globally else Q(),
+    ).count()
     echues_count = echues_clients_count + echues_fournisseurs_count
 
     # Previous week echues
     echues_prev_clients = Traite.objects.filter(
-        date_echeance__lt=start_curr,
+        date_echeance__lt=start_date,
         date_echeance__gte=start_prev,
         plan_traite__is_deleted = False,
         status="NON_PAYEE"
     ).aggregate(total=Sum("montant"))["total"] or 0
     echues_prev_fournisseurs = TraiteFournisseur.objects.filter(
-        date_echeance__lt=start_curr,
+        date_echeance__lt=start_date,
         date_echeance__gte=start_prev,
         plan_traite__is_deleted = False,
         status="NON_PAYEE"

@@ -314,7 +314,7 @@ class FactureAchatMatiereSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = FactureAchatMatiere
-        fields = ['id', 'numero', 'fournisseur', 'type_achat','mode_paiement', 'mixte_comptant', 'prix_total', 'date_facture', 'achats']
+        fields = ['id', 'numero', 'fournisseur','mode_paiement', 'mixte_comptant', 'prix_total', 'date_facture', 'achats']
 
     def create(self, validated_data):
         achats_data = validated_data.pop('achats', [])
@@ -356,7 +356,7 @@ class BonLivraisonMatiereSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = BonLivraisonMatiere
-        fields = ['id', 'numero', 'fournisseur', 'type_achat', 'prix_total', 'date_livraison', 'livraisons']
+        fields = ['id', 'numero', 'fournisseur', 'prix_total', 'date_livraison', 'livraisons']
 
     def create(self, validated_data):
         livraisons_data = validated_data.pop('livraisons', [])

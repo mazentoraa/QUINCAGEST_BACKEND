@@ -1966,11 +1966,6 @@ class FactureAchatMatiere(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
     fournisseur = models.CharField(max_length=255, blank=True, null=True)
 
-    TYPE_ACHAT_CHOICES = [
-        ('matière première', 'matière première'),
-        ('consommable', 'consommable'),
-        ('autres', 'autres'),
-    ]
     mode_paiement = models.CharField(
         max_length=20,
         choices=[
@@ -1985,8 +1980,6 @@ class FactureAchatMatiere(models.Model):
         help_text="Payment method",
     )
     mixte_comptant = models.IntegerField(default=0, help_text='Cash part for mode_paiement mixte')
-    type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
-
     prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     date_facture = models.DateField(blank=True, null=True)
 
@@ -2009,12 +2002,6 @@ class BonLivraisonMatiere(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
     fournisseur = models.CharField(max_length=255, blank=True, null=True)
 
-    TYPE_ACHAT_CHOICES = [
-        ('matière première', 'matière première'),
-        ('consommable', 'consommable'),
-        ('autres', 'autres'),
-    ]
-    type_achat = models.CharField(max_length=50, choices=TYPE_ACHAT_CHOICES, blank=True, null=True)
 
     prix_total = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     date_livraison = models.DateField(blank=True, null=True)
@@ -2316,7 +2303,7 @@ class FichePaie(models.Model):
     conge_maladie_a = models.FloatField(default=0)
     banque = models.CharField(max_length=100, null=True, blank=True)
     rib = models.CharField(max_length=100, null=True, blank=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
+    date_paiement = models.DateTimeField(auto_now_add=True)
     statut = models.CharField(max_length=50, default='Générée')
 
     # Calculs (déjà calculés en front, mais prévues ici pour cohérence)
