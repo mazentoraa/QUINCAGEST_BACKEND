@@ -15,7 +15,7 @@ def appliquer_remboursement_avance(fiche_paie):
 
             Remboursement.objects.create(
                 avance=avance,
-                date=fiche_paie.date_creation.date(),
+                date=fiche_paie.date_paiement.date(),
                 montant=montant
             )
 

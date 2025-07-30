@@ -86,7 +86,7 @@ def compute_expenses(start_date=None, end_date=None, globally=False):
     # 5. Salaires payés (net à payer)
     salaires_payes_total = compute_total(
             model=FichePaie,
-            date_field='date_creation',
+            date_field='date_paiement',
             date_range=None if globally else (start_date, end_date),
             aggregate_expression={'total': Sum('net_a_payer')}
         )
@@ -280,9 +280,11 @@ def get_treasury_evolution_weeks(evolution_weeks):
     # Number of weeks to include
     def period_to_num_weeks(period: str) -> int:
         if period == "90d":
-            return 13  
+            return 18 # trimestre = 4 months = 120d  
         elif period == "1y":
             return 52
+        elif period == "7d":
+            return 1
         return 4  # default: 30d = 4 weeks
     num_weeks = period_to_num_weeks(evolution_weeks)
 
@@ -352,7 +354,7 @@ def get_total_transactions_count(range_func):
     total += Traite.objects.filter(**this_week_range_func("date_echeance")).count()
     total += FactureAchatMatiere.objects.filter(**this_week_range_func("date_facture")).count()
     total += TraiteFournisseur.objects.filter(**this_week_range_func("date_echeance")).count()
-    total += FichePaie.objects.filter(**this_week_range_func("date_creation")).count()
+    total += FichePaie.objects.filter(**this_week_range_func("date_paiement")).count()
     total += Avance.objects.filter(**this_week_range_func("date_demande")).count()
 
     return total
@@ -455,24 +457,24 @@ def generate_alerts(forecast, balance, expected_income, expected_expense):
     return alerts
 
 
-def compute_kpis(evolution_weeks):
+def compute_kpis(evolution_weeks, range_func=get_week_range):
     """
     This function aggregates KPI values such as balance, income, expense, and forecast.
     """
-    global_income, income_value, income_trend, previous_income = compute_income_trend(get_week_range)
+    global_income, income_value, income_trend, previous_income = compute_income_trend(range_func)
     print('Global expenses: ', global_income, ' Income value: ', income_value, ' | Income trend: ', income_trend)
     
 
-    global_expenses, expenses_value, expenses_trend, previous_expenses = compute_expense_trend(get_week_range)
+    global_expenses, expenses_value, expenses_trend, previous_expenses = compute_expense_trend(range_func)
     print('Global expenses: ', global_expenses, 'Expenses value: ', expenses_value, ' | Expenses trend: ', expenses_trend)
 
     global_balance, balance_value, balance_trend, previous_balance = compute_balance_trend(global_income, global_expenses, income_value, expenses_value)
     print('Global expenses: ', global_expenses, ' Balance value: ', balance_value, ' | Balance trend: ', balance_trend)
 
-    expected_expenses_value, expected_expenses_trend, previous_expected_expenses = compute_expected_expenses_trend(get_week_range)
+    expected_expenses_value, expected_expenses_trend, previous_expected_expenses = compute_expected_expenses_trend(range_func)
     print('Expected income value: ', expected_expenses_value, ' | Income trend: ', expected_expenses_trend)
     
-    expected_income_value, expected_income_trend, previous_expected_income = compute_expected_income_trend(get_week_range)
+    expected_income_value, expected_income_trend, previous_expected_income = compute_expected_income_trend(range_func)
     print('Expected income value: ', expected_income_value, ' | Income trend: ', expected_income_trend)
 
     forecast_value, forecast_trend = compute_forecast_trend(balance_value, previous_balance, expected_income_value, previous_expected_income, expected_expenses_value, previous_expected_expenses)
