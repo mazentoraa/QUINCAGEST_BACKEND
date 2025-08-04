@@ -2432,3 +2432,4 @@ class AvoirArticle(models.Model):
     @property
     def total(self):
         return self.prix * self.quantite
+    

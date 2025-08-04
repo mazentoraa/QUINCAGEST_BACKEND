@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Count
 
-from .models import Client, Matiere, Produit, Traveaux, FactureTravaux, Devis, Commande
+from .models import Client, Matiere, Produit, Traveaux, FactureTravaux, Devis, Commande, Fournisseur, Employe
 from .commande_serializers import CommandeListSerializer
 
 
@@ -20,6 +20,8 @@ def global_counts(request):
         "total_devis": Devis.objects.count(),
         "total_commandes": Commande.objects.count(),
         "total_factures_travaux": FactureTravaux.objects.count(),
+        "total_fournisseurs": Fournisseur.objects.count(),
+        "total_employees": Employe.objects.count(),
     }
     return Response(counts)
 
@@ -112,6 +114,8 @@ def main_dashboard_insights(request):
             "devis": Devis.objects.count(),
             "commandes": Commande.objects.count(),
             "factures_travaux": FactureTravaux.objects.count(),
+            "fournisseurs": Fournisseur.objects.count(),
+            "employees": Employe.objects.count(),
         },
         "financials": {
             "total_invoiced_ttc": FactureTravaux.objects.aggregate(
