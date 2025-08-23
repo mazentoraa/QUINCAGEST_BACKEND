@@ -44,11 +44,19 @@ class DevisListSerializer(serializers.ModelSerializer):
         read_only_fields = ["montant_ht", "montant_tva", "montant_ttc"]
 
 
+class DevisProduitSerializer(serializers.Serializer):
+    produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
+    quantite = serializers.IntegerField(min_value=1)
+    prix_unitaire = serializers.FloatField(required=False, allow_null=True)
+    remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
+
+
 class DevisDetailSerializer(serializers.ModelSerializer):
     produit_devis = ProduitDevisSerializer(many=True, read_only=True)
     nom_client = serializers.ReadOnlyField(source="client.nom_client")
     produits_details = serializers.SerializerMethodField()
     code_client = serializers.ReadOnlyField(source="client.code_client")
+    produits = DevisProduitSerializer(many=True, write_only=True, required=False)
 
     class Meta:
         model = Devis
@@ -104,12 +112,60 @@ class DevisDetailSerializer(serializers.ModelSerializer):
             ret.pop("produits_details", None)
         return ret
 
+    def _group_products(self, produits_data):
+        # Regroupe les produits par ID et additionne les quantités
+        grouped = {}
+        for prod in produits_data:
+            pid = prod["produit"].id if hasattr(prod["produit"], "id") else prod["produit"]
+            if pid not in grouped:
+                grouped[pid] = prod.copy()
+            else:
+                grouped[pid]["quantite"] += prod["quantite"]
+                # Optionnel : écrase prix/remise par le dernier
+                grouped[pid]["prix_unitaire"] = prod.get("prix_unitaire", grouped[pid].get("prix_unitaire"))
+                grouped[pid]["remise_pourcentage"] = prod.get("remise_pourcentage", grouped[pid].get("remise_pourcentage", 0))
+        return list(grouped.values())
 
-class DevisProduitSerializer(serializers.Serializer):
-    produit = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all())
-    quantite = serializers.IntegerField(min_value=1)
-    prix_unitaire = serializers.FloatField(required=False, allow_null=True)
-    remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
+    def update(self, instance, validated_data):
+        produits_data = validated_data.pop("produits", None)
+        # Met à jour les autres champs
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        # Met à jour les produits si fournis
+        if produits_data is not None:
+            # Supprimer les anciens produits
+            instance.produit_devis.all().delete()
+            produits_data = self._group_products(produits_data)
+            # Ajouter les nouveaux produits
+            for prod in produits_data:
+                ProduitDevis.objects.create(
+                    devis=instance,
+                    produit=prod["produit"],
+                    quantite=prod["quantite"],
+                    prix_unitaire=prod.get("prix_unitaire"),
+                    remise_pourcentage=prod.get("remise_pourcentage", 0),
+                )
+            instance.calculate_totals()
+            instance.save()
+        return instance
+
+    def create(self, validated_data):
+        produits_data = validated_data.pop("produits", None)
+        devis = Devis.objects.create(**validated_data)
+        if produits_data:
+            produits_data = self._group_products(produits_data)
+            for prod in produits_data:
+                ProduitDevis.objects.create(
+                    devis=devis,
+                    produit=prod["produit"],
+                    quantite=prod["quantite"],
+                    prix_unitaire=prod.get("prix_unitaire"),
+                    remise_pourcentage=prod.get("remise_pourcentage", 0),
+                )
+            devis.calculate_totals()
+            devis.save()
+        return devis
 
 
 class DevisConvertToCommandeSerializer(serializers.Serializer):

@@ -38,34 +38,11 @@ class DevisViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         with transaction.atomic():
-            # Récupération de la valeur du timbre fiscal si elle est envoyée
             timbre_fiscal = request.data.get("timbre_fiscal", None)
             if timbre_fiscal is not None:
                 serializer.validated_data["timbre_fiscal"] = timbre_fiscal
-
             devis = serializer.save()
-
-            # Ajout des produits si présents
-            if "produits" in request.data and isinstance(request.data["produits"], list):
-                for produit_data in request.data["produits"]:
-                    produit_serializer = DevisProduitSerializer(data=produit_data)
-                    if produit_serializer.is_valid():
-                        ProduitDevis.objects.create(
-                            devis=devis,
-                            produit=produit_serializer.validated_data["produit"],
-                            quantite=produit_serializer.validated_data["quantite"],
-                            prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
-                            remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
-                        )
-                    else:
-                        print(f"Invalid product data: {produit_serializer.errors}")
-
-            # Calcul des totaux après ajout
-            devis.calculate_totals()
-            devis.save()
-
         return Response(self.get_serializer(devis).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
