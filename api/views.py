@@ -25,144 +25,144 @@ from rest_framework import viewsets, filters
 from .models import MatierePremiereAchat
 from .serializers import MatierePremiereAchatSerializer
 
+# A supprimer
+# class MatiereViewSet(viewsets.ModelViewSet):
+#     """
+#     API pour la gestion des matières premières.
 
-class MatiereViewSet(viewsets.ModelViewSet):
-    """
-    API pour la gestion des matières premières.
+#     Liste toutes les matières, crée de nouvelles matières, et modifie ou supprime les matières existantes.
+#     """
 
-    Liste toutes les matières, crée de nouvelles matières, et modifie ou supprime les matières existantes.
-    """
+#     permission_classes = [IsAdminUser]
+#     queryset = Matiere.objects.all().order_by("-date_creation")
+#     serializer_class = MatiereSerializer
 
-    permission_classes = [IsAdminUser]
-    queryset = Matiere.objects.all().order_by("-date_creation")
-    serializer_class = MatiereSerializer
+#     @swagger_auto_schema(
+#         operation_description="Récupérer les matières filtrées par client",
+#         manual_parameters=[
+#             openapi.Parameter(
+#                 "client_id",
+#                 openapi.IN_QUERY,
+#                 description="ID du client pour filtrer les matières",
+#                 type=openapi.TYPE_INTEGER,
+#                 required=True,
+#             )
+#         ],
+#         responses={
+#             200: MatiereSerializer(many=True),
+#             400: "Paramètre client_id manquant",
+#         },
+#     )
+#     @action(detail=False, methods=["get"])
+#     def by_client(self, request):
+#         """
+#         Get materials filtered by client
+#         """
+#         client_id = request.query_params.get("client_id")
+#         if not client_id:
+#             return Response(
+#                 {"message": "Le paramètre client_id est obligatoire"},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
 
-    @swagger_auto_schema(
-        operation_description="Récupérer les matières filtrées par client",
-        manual_parameters=[
-            openapi.Parameter(
-                "client_id",
-                openapi.IN_QUERY,
-                description="ID du client pour filtrer les matières",
-                type=openapi.TYPE_INTEGER,
-                required=True,
-            )
-        ],
-        responses={
-            200: MatiereSerializer(many=True),
-            400: "Paramètre client_id manquant",
-        },
-    )
-    @action(detail=False, methods=["get"])
-    def by_client(self, request):
-        """
-        Get materials filtered by client
-        """
-        client_id = request.query_params.get("client_id")
-        if not client_id:
-            return Response(
-                {"message": "Le paramètre client_id est obligatoire"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#         materials = self.queryset.filter(client_id=client_id)
+#         serializer = self.get_serializer(materials, many=True)
+#         return Response(serializer.data)
 
-        materials = self.queryset.filter(client_id=client_id)
-        serializer = self.get_serializer(materials, many=True)
-        return Response(serializer.data)
-
-    def perform_create(self, serializer):
-        client_id = self.request.data.get("client_id")
-        if client_id:
-            try:
-                client = Client.objects.get(pk=client_id)
-                serializer.save(client=client)
-            except Client.DoesNotExist:
-                raise ValidationError({"client_id": "Client not found"})
-        else:
-            serializer.save()
+#     def perform_create(self, serializer):
+#         client_id = self.request.data.get("client_id")
+#         if client_id:
+#             try:
+#                 client = Client.objects.get(pk=client_id)
+#                 serializer.save(client=client)
+#             except Client.DoesNotExist:
+#                 raise ValidationError({"client_id": "Client not found"})
+#         else:
+#             serializer.save()
 
 
-class TraveauxViewSet(viewsets.ModelViewSet):
-    """
-    API pour la gestion des travaux.
+# class TraveauxViewSet(viewsets.ModelViewSet):
+#     """
+#     API pour la gestion des travaux.
 
-    Liste tous les travaux, crée de nouveaux travaux, et modifie ou supprime les travaux existants.
-    Les travaux sont liés à des clients, des produits, et peuvent utiliser différentes matières.
-    """
+#     Liste tous les travaux, crée de nouveaux travaux, et modifie ou supprime les travaux existants.
+#     Les travaux sont liés à des clients, des produits, et peuvent utiliser différentes matières.
+#     """
 
-    permission_classes = [IsAdminUser]
-    queryset = Traveaux.objects.all().order_by("-date_creation")
-    serializer_class = TraveauxSerializer
+#     permission_classes = [IsAdminUser]
+#     queryset = Traveaux.objects.all().order_by("-date_creation")
+#     serializer_class = TraveauxSerializer
 
-    def get_queryset(self):
-        """
-        Override to include matiere usage data in response
-        """
-        return self.queryset.prefetch_related("matiere_usages__matiere")
+#     def get_queryset(self):
+#         """
+#         Override to include matiere usage data in response
+#         """
+#         return self.queryset.prefetch_related("matiere_usages__matiere")
 
-    @transaction.atomic
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
+#     @transaction.atomic
+#     def destroy(self, request, *args, **kwargs):
+#         instance = self.get_object()
 
-        # Restore materials before deleting
-        for usage in instance.matiere_usages.all():
-            if usage.source == "client" and usage.matiere:
-                usage.matiere.remaining_quantity += usage.quantite_utilisee
-                usage.matiere.save()
-            elif usage.source == "stock" and usage.achat:
-                usage.achat.remaining_quantity += usage.quantite_utilisee
-                usage.achat.save()
+#         # Restore materials before deleting
+#         for usage in instance.matiere_usages.all():
+#             if usage.source == "client" and usage.matiere:
+#                 usage.matiere.remaining_quantity += usage.quantite_utilisee
+#                 usage.matiere.save()
+#             elif usage.source == "stock" and usage.achat:
+#                 usage.achat.remaining_quantity += usage.quantite_utilisee
+#                 usage.achat.save()
 
-        # Delete the work
-        instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+#         # Delete the work
+#         instance.delete()
+#         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def perform_create(self, serializer):
-        print("📥 Request data:", self.request.data)
-        client_id = self.request.data.get("client_id")
-        produit_id = self.request.data.get("produit_id")
-        if client_id and produit_id:
-            try:
-                client = Client.objects.get(pk=client_id)
-                produit = Produit.objects.get(pk=produit_id)
-                serializer.save(client=client, produit=produit)
-            except (Client.DoesNotExist, Produit.DoesNotExist):
-                raise ValidationError(
-                    {"client_id": "Client not found", "produit_id": "Produit not found"}
-                )
-        else:
-            serializer.save()
+#     def perform_create(self, serializer):
+#         print("📥 Request data:", self.request.data)
+#         client_id = self.request.data.get("client_id")
+#         produit_id = self.request.data.get("produit_id")
+#         if client_id and produit_id:
+#             try:
+#                 client = Client.objects.get(pk=client_id)
+#                 produit = Produit.objects.get(pk=produit_id)
+#                 serializer.save(client=client, produit=produit)
+#             except (Client.DoesNotExist, Produit.DoesNotExist):
+#                 raise ValidationError(
+#                     {"client_id": "Client not found", "produit_id": "Produit not found"}
+#                 )
+#         else:
+#             serializer.save()
 
-    @swagger_auto_schema(
-        operation_description="Récupérer les travaux filtrés par client",
-        manual_parameters=[
-            openapi.Parameter(
-                "client_id",
-                openapi.IN_QUERY,
-                description="ID du client pour filtrer les travaux",
-                type=openapi.TYPE_INTEGER,
-                required=True,
-            )
-        ],
-        responses={
-            200: TraveauxSerializer(many=True),
-            400: "Paramètre client_id manquant",
-        },
-    )
-    @action(detail=False, methods=["get"])
-    def by_client(self, request):
-        """
-        Get works filtered by client
-        """
-        client_id = request.query_params.get("client_id")
-        if not client_id:
-            return Response(
-                {"message": "Le paramètre client_id est obligatoire"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#     @swagger_auto_schema(
+#         operation_description="Récupérer les travaux filtrés par client",
+#         manual_parameters=[
+#             openapi.Parameter(
+#                 "client_id",
+#                 openapi.IN_QUERY,
+#                 description="ID du client pour filtrer les travaux",
+#                 type=openapi.TYPE_INTEGER,
+#                 required=True,
+#             )
+#         ],
+#         responses={
+#             200: TraveauxSerializer(many=True),
+#             400: "Paramètre client_id manquant",
+#         },
+#     )
+#     @action(detail=False, methods=["get"])
+#     def by_client(self, request):
+#         """
+#         Get works filtered by client
+#         """
+#         client_id = request.query_params.get("client_id")
+#         if not client_id:
+#             return Response(
+#                 {"message": "Le paramètre client_id est obligatoire"},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
 
-        travaux = self.get_queryset().filter(client_id=client_id)
-        serializer = self.get_serializer(travaux, many=True)
-        return Response(serializer.data)
+#         travaux = self.get_queryset().filter(client_id=client_id)
+#         serializer = self.get_serializer(travaux, many=True)
+#         return Response(serializer.data)
 
 
 from rest_framework import viewsets, status
@@ -456,37 +456,38 @@ class ProduitViewSet(viewsets.ModelViewSet):
             "message": f"{deleted_count} produits supprimés définitivement de la corbeille"
         })
 
-    @swagger_auto_schema(
-        operation_description="Récupérer les produits filtrés par type de matière",
-        manual_parameters=[
-            openapi.Parameter(
-                "type_matiere",
-                openapi.IN_QUERY,
-                description="Type de matière pour filtrer les produits",
-                type=openapi.TYPE_STRING,
-                required=True,
-            )
-        ],
-        responses={
-            200: ProduitSerializer(many=True),
-            400: "Paramètre type_matiere manquant",
-        },
-    )
-    @action(detail=False, methods=["get"])
-    def by_material_type(self, request):
-        """
-        Get products filtered by material type
-        """
-        type_matiere = request.query_params.get("type_matiere")
-        if not type_matiere:
-            return Response(
-                {"message": "Le paramètre type_matiere est obligatoire"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    # A supprimer
+    # @swagger_auto_schema(
+    #     operation_description="Récupérer les produits filtrés par type de matière",
+    #     manual_parameters=[
+    #         openapi.Parameter(
+    #             "type_matiere",
+    #             openapi.IN_QUERY,
+    #             description="Type de matière pour filtrer les produits",
+    #             type=openapi.TYPE_STRING,
+    #             required=True,
+    #         )
+    #     ],
+    #     responses={
+    #         200: ProduitSerializer(many=True),
+    #         400: "Paramètre type_matiere manquant",
+    #     },
+    # )
+    # @action(detail=False, methods=["get"])
+    # def by_material_type(self, request):
+    #     """
+    #     Get products filtered by material type
+    #     """
+    #     type_matiere = request.query_params.get("type_matiere")
+    #     if not type_matiere:
+    #         return Response(
+    #             {"message": "Le paramètre type_matiere est obligatoire"},
+    #             status=status.HTTP_400_BAD_REQUEST,
+    #         )
         
-        products = self.get_queryset().filter(type_matiere=type_matiere)
-        serializer = self.get_serializer(products, many=True)
-        return Response(serializer.data)
+    #     products = self.get_queryset().filter(type_matiere=type_matiere)
+    #     serializer = self.get_serializer(products, many=True)
+    #     return Response(serializer.data)
 
 class AdminLoginView(APIView):
     """
@@ -650,11 +651,12 @@ from rest_framework.response import Response
 from .models import MatierePremiereAchat
 from .serializers import MatierePremiereAchatSerializer
 
-class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
+# A supprimer
+class ProduitAchatViewSet(viewsets.ModelViewSet):
     queryset = MatierePremiereAchat.objects.all().order_by("-created_at")
     serializer_class = MatierePremiereAchatSerializer
     filter_backends = [filters.SearchFilter]
-    search_fields = ['ref', 'nom_matiere', 'fournisseur_principal']
+    search_fields = ['ref', 'nom_produit', 'fournisseur_principal']
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -684,27 +686,27 @@ class MatierePremiereAchatViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         self.perform_destroy(instance)
-        return Response({"message": "Matière supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)
+        return Response({"message": "Produit supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)
 
 
 
 
 from rest_framework import viewsets
 from .models import FactureAchatMatiere
-from .serializers import FactureAchatMatiereSerializer
+from .serializers import FactureAchatProduitSerializer
 
-class FactureAchatMatiereViewSet(viewsets.ModelViewSet):
+class FactureAchatProduitViewSet(viewsets.ModelViewSet):
     queryset = FactureAchatMatiere.objects.all().order_by('-id')
-    serializer_class = FactureAchatMatiereSerializer
+    serializer_class = FactureAchatProduitSerializer
 
 
 from rest_framework import viewsets
-from .models import BonLivraisonMatiere
-from .serializers import BonLivraisonMatiereSerializer
+from .models import BonLivraisonProduit
+from .serializers import BonLivraisonProduitSerializer
 
 class BonLivraisonMatiereViewSet(viewsets.ModelViewSet):
-    queryset = BonLivraisonMatiere.objects.all().order_by('-id')
-    serializer_class = BonLivraisonMatiereSerializer
+    queryset = BonLivraisonProduit.objects.all().order_by('-id')
+    serializer_class = BonLivraisonProduitSerializer
 
 
 
@@ -774,11 +776,11 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 
-from .models import BonRetourFournisseur, Fournisseur, MatiereRetourFournisseur, Matiere
+from .models import BonRetourFournisseur, Fournisseur, ProduitRetourFournisseur, Produit
 from .serializers import (
     BonRetourFournisseurSerializer,
     BonRetourFournisseurListSerializer,
-    MatiereForRetourFournisseurSerializer,
+    ProduitForRetourFournisseurSerializer,
 )
 
 
@@ -821,7 +823,7 @@ def fournisseur_available_materials(request, fournisseur_id):
         fournisseur = get_object_or_404(Fournisseur, id=fournisseur_id)
 
         bons = BonRetourFournisseur.objects.filter(fournisseur=fournisseur, is_deleted=False)
-        matieres = MatiereRetourFournisseur.objects.filter(bon_retour__in=bons, is_deleted=False)
+        produits = ProduitRetourFournisseur.objects.filter(bon_retour__in=bons, is_deleted=False)
 
         response_data = {
             "fournisseur": {
@@ -831,10 +833,10 @@ def fournisseur_available_materials(request, fournisseur_id):
             },
             "available_materials": [
                 {
-                    "nom_matiere": m.nom_matiere,
+                    "nom_produit": m.nom_produit,
                     "quantite_retournee": m.quantite_retournee,
                 }
-                for m in matieres
+                for m in produits
             ],
         }
 
@@ -846,45 +848,45 @@ def fournisseur_available_materials(request, fournisseur_id):
 
 @api_view(["POST"])
 def validate_return_quantities_fournisseur(request):
-    materials_data = request.data.get("materials", [])
+    products_data = request.data.get("products", [])
 
-    if not materials_data:
+    if not products_data:
         return Response(
-            {"error": "No materials provided for validation"},
+            {"error": "No products provided for validation"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     validation_results = []
     has_errors = False
 
-    for material_data in materials_data:
-        matiere_id = material_data.get("matiere_id")
-        quantite_retournee = material_data.get("quantite_retournee", 0)
+    for products_data in products_data:
+        produit_id = products_data.get("produit_id")
+        quantite_retournee = products_data.get("quantite_retournee", 0)
 
         try:
-            matiere = Matiere.objects.get(id=matiere_id)
+            produit = Matiere.objects.get(id=produit_id)
 
             result = {
-                "matiere_id": matiere_id,
-                "matiere_name": f"{matiere.type_matiere} - {matiere.nom_matiere}",
+                "produit_id": produit_id,
+                "produit_name": f"{produit.nom_produit}",
                 "requested_quantity": quantite_retournee,
-                "available_quantity": matiere.remaining_quantity,
-                "is_valid": quantite_retournee <= matiere.remaining_quantity,
+                "available_quantity": produit.remaining_quantity,
+                "is_valid": quantite_retournee <= produit.remaining_quantity,
             }
 
             if not result["is_valid"]:
                 result["error"] = (
-                    f"Cannot return {quantite_retournee} units. Only {matiere.remaining_quantity} available."
+                    f"Cannot return {quantite_retournee} units. Only {produit.remaining_quantity} available."
                 )
                 has_errors = True
 
             validation_results.append(result)
 
-        except Matiere.DoesNotExist:
+        except Produit.DoesNotExist:
             validation_results.append(
                 {
-                    "matiere_id": matiere_id,
-                    "error": "Material not found",
+                    "produit_id": produit_id,
+                    "error": "Product not found",
                     "is_valid": False,
                 }
             )
@@ -933,7 +935,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from .models import PlanTraiteFournisseur, TraiteFournisseur, FactureAchatMatiere, Fournisseur
+from .models import PlanTraiteFournisseur, TraiteFournisseur, FactureAchatProduit, Fournisseur
 from .serializers import (  # <- adapte si autre nom
     PlanTraiteFournisseurSerializer,
     TraiteFournisseurSerializer,
