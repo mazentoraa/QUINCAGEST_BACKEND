@@ -114,84 +114,84 @@ class Client(models.Model):
         else:
             super().save(*args, **kwargs)
 
+# A supprimer
+# class Matiere(models.Model):
+#     client = models.ForeignKey(
+#         Client, on_delete=models.CASCADE, related_name="matieres", help_text="Client"
+#     )
+#     numero_bon = models.CharField(
+#         max_length=50,
+#         unique=True,
+#         help_text="Material reception number",
+#         null=True,
+#         blank=True,
+#     )
+#     type_matiere = models.CharField(
+#         max_length=50,
+#         choices=[
+#             ("acier", "Acier"),
+#             ("acier_inoxydable", "Acier inoxydable"),
+#             ("aluminium", "Aluminium"),
+#             ("laiton", "Laiton"),
+#             ("cuivre", "Cuivre"),
+#             ("acier_galvanise", "Acier galvanisé"),
+#             ("autre", "Autre"),
+#         ],
+#         default="autre",
+#         help_text="Material type",
+#     )
+#     description = models.TextField(blank=True, null=True, help_text="Material description")
+#     reception_date = models.DateField(help_text="Date of material reception", null=True, blank=True)
+#     thickness = models.IntegerField(help_text="Thickness in mm", null=True, blank=True)
+#     length = models.IntegerField(help_text="Length in mm", null=True, blank=True)
+#     width = models.IntegerField(help_text="Width in mm", null=True, blank=True)
+#     surface = models.IntegerField(help_text="Surface area (m²)", null=True, blank=True)
+#     prix_unitaire = models.FloatField(help_text="Unit price", null=True, blank=True)
+#     quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock")
+#     remaining_quantity = models.PositiveIntegerField(default=0, help_text="Remaining quantity")
+#     date_creation = models.DateTimeField(auto_now_add=True)
+#     derniere_mise_a_jour = models.DateTimeField(auto_now=True)
+#     is_deleted = models.BooleanField(default=False)
+#     deleted_at = models.DateTimeField(null=True, blank=True)
 
-class Matiere(models.Model):
-    client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, related_name="matieres", help_text="Client"
-    )
-    numero_bon = models.CharField(
-        max_length=50,
-        unique=True,
-        help_text="Material reception number",
-        null=True,
-        blank=True,
-    )
-    type_matiere = models.CharField(
-        max_length=50,
-        choices=[
-            ("acier", "Acier"),
-            ("acier_inoxydable", "Acier inoxydable"),
-            ("aluminium", "Aluminium"),
-            ("laiton", "Laiton"),
-            ("cuivre", "Cuivre"),
-            ("acier_galvanise", "Acier galvanisé"),
-            ("autre", "Autre"),
-        ],
-        default="autre",
-        help_text="Material type",
-    )
-    description = models.TextField(blank=True, null=True, help_text="Material description")
-    reception_date = models.DateField(help_text="Date of material reception", null=True, blank=True)
-    thickness = models.IntegerField(help_text="Thickness in mm", null=True, blank=True)
-    length = models.IntegerField(help_text="Length in mm", null=True, blank=True)
-    width = models.IntegerField(help_text="Width in mm", null=True, blank=True)
-    surface = models.IntegerField(help_text="Surface area (m²)", null=True, blank=True)
-    prix_unitaire = models.FloatField(help_text="Unit price", null=True, blank=True)
-    quantite = models.PositiveIntegerField(default=0, help_text="Quantity in stock")
-    remaining_quantity = models.PositiveIntegerField(default=0, help_text="Remaining quantity")
-    date_creation = models.DateTimeField(auto_now_add=True)
-    derniere_mise_a_jour = models.DateTimeField(auto_now=True)
-    is_deleted = models.BooleanField(default=False)
-    deleted_at = models.DateTimeField(null=True, blank=True)
+#     def __str__(self):
+#         return f"{self.type_matiere} - {self.client.nom_client}"
 
-    def __str__(self):
-        return f"{self.type_matiere} - {self.client.nom_client}"
+#     def save(self, *args, **kwargs):
+#         # Initialiser la quantité restante à la création
+#         if not self.pk or self.remaining_quantity == 0:
+#             self.remaining_quantity = self.quantite
 
-    def save(self, *args, **kwargs):
-        # Initialiser la quantité restante à la création
-        if not self.pk or self.remaining_quantity == 0:
-            self.remaining_quantity = self.quantite
+#         # Générer un numero_bon unique s'il est vide
+#         if not self.numero_bon:
+#             year = timezone.now().year
+#             prefix = f"BL-{year}-"
+#             last_num = (
+#                 Matiere.objects
+#                 .filter(numero_bon__startswith=prefix)
+#                 .order_by("-numero_bon")
+#                 .values_list("numero_bon", flat=True)
+#                 .first()
+#             )
 
-        # Générer un numero_bon unique s'il est vide
-        if not self.numero_bon:
-            year = timezone.now().year
-            prefix = f"BL-{year}-"
-            last_num = (
-                Matiere.objects
-                .filter(numero_bon__startswith=prefix)
-                .order_by("-numero_bon")
-                .values_list("numero_bon", flat=True)
-                .first()
-            )
+#             if last_num:
+#                 try:
+#                     last_number = int(last_num.split("-")[-1])
+#                 except ValueError:
+#                     last_number = 0
+#             else:
+#                 last_number = 0
 
-            if last_num:
-                try:
-                    last_number = int(last_num.split("-")[-1])
-                except ValueError:
-                    last_number = 0
-            else:
-                last_number = 0
+#             self.numero_bon = f"{prefix}{str(last_number + 1).zfill(5)}"
 
-            self.numero_bon = f"{prefix}{str(last_number + 1).zfill(5)}"
+#         super().save(*args, **kwargs)
 
-        super().save(*args, **kwargs)
-
-    def update_quantity_after_usage(self, amount_used):
-        if self.remaining_quantity >= amount_used:
-            self.remaining_quantity -= amount_used
-            self.save()
-            return True
-        return False
+#     def update_quantity_after_usage(self, amount_used):
+#         if self.remaining_quantity >= amount_used:
+#             self.remaining_quantity -= amount_used
+#             self.save()
+#             return True
+#         return False
 
 
 class Produit(models.Model):
@@ -289,171 +289,171 @@ class Produit(models.Model):
     def __str__(self):
         return self.nom_produit
 
+# A supprimer
+# class MatierePremiereAchat(models.Model):
+#     ref = models.CharField(max_length=100, unique=True)
+#     nom_matiere = models.CharField(max_length=200)
 
-class MatierePremiereAchat(models.Model):
-    ref = models.CharField(max_length=100, unique=True)
-    nom_matiere = models.CharField(max_length=200)
+#     categorie = models.CharField(
+#         max_length=100,
+#         choices=[
+#             ("acier", "Acier"),
+#             ("acier_inoxydable", "Acier inoxydable"),
+#             ("aluminium", "Aluminium"),
+#             ("laiton", "Laiton"),
+#             ("cuivre", "Cuivre"),
+#             ("acier_galvanise", "Acier galvanisé"),
+#             ("metaux","Metaux"),
+#             ("autre", "Autre"),
+#         ],
+#         default="autre",
+#     )
 
-    categorie = models.CharField(
-        max_length=100,
-        choices=[
-            ("acier", "Acier"),
-            ("acier_inoxydable", "Acier inoxydable"),
-            ("aluminium", "Aluminium"),
-            ("laiton", "Laiton"),
-            ("cuivre", "Cuivre"),
-            ("acier_galvanise", "Acier galvanisé"),
-            ("metaux","Metaux"),
-            ("autre", "Autre"),
-        ],
-        default="autre",
-    )
+#     description = models.TextField(blank=True, null=True)
+#     unite_mesure = models.CharField(
+#         max_length=10,
+#         choices=[
+#             ("kg", "Kilogramme"),
+#             ("pcs", "Pièce"),
+#             ("m2", "Mètre carré"),
+#             ("m3", "Mètre cube"),
+#         ],
+#         default="kg"
+#     )
 
-    description = models.TextField(blank=True, null=True)
-    unite_mesure = models.CharField(
-        max_length=10,
-        choices=[
-            ("kg", "Kilogramme"),
-            ("pcs", "Pièce"),
-            ("m2", "Mètre carré"),
-            ("m3", "Mètre cube"),
-        ],
-        default="kg"
-    )
+#     longueur = models.DecimalField(
+#         max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
+#     )
+#     largeur = models.DecimalField(
+#         max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
+#     )
+#     epaisseur = models.DecimalField(
+#         max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
+#     )
+#     surface = models.DecimalField(
+#         max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
+#     )
 
-    longueur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Longueur en mètres"
-    )
-    largeur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Largeur en mètres"
-    )
-    epaisseur = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Épaisseur en mm"
-    )
-    surface = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True, help_text="Surface en m²"
-    )
+#     remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+#     stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+#     emplacement = models.CharField(max_length=200, blank=True, null=True)
 
-    remaining_quantity = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    stock_minimum = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    emplacement = models.CharField(max_length=200, blank=True, null=True)
+#     fournisseur_principal = models.CharField(max_length=200)
+#     prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
+#     date_reception = models.DateField()
+#     ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
 
-    fournisseur_principal = models.CharField(max_length=200)
-    prix_unitaire = models.DecimalField(max_digits=10, decimal_places=3)
-    date_reception = models.DateField()
-    ref_fournisseur = models.CharField(max_length=100, blank=True, null=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+#     def __str__(self):
+#         return f"{self.ref} - {self.nom_matiere}"
 
-    def __str__(self):
-        return f"{self.ref} - {self.nom_matiere}"
+# class MatiereUsage(models.Model):
+#     SOURCE_CHOICES = [
+#         ("stock", "Main Stock"),
+#         ("client", "Client Provided"),
+#     ]
 
-class MatiereUsage(models.Model):
-    SOURCE_CHOICES = [
-        ("stock", "Main Stock"),
-        ("client", "Client Provided"),
-    ]
-
-    achat = models.ForeignKey(MatierePremiereAchat, null=True, blank=True, on_delete=models.SET_NULL)
+#     achat = models.ForeignKey(MatierePremiereAchat, null=True, blank=True, on_delete=models.SET_NULL)
     
-    travaux = models.ForeignKey(
-        "Traveaux",
-        on_delete=models.CASCADE,
-        related_name="matiere_usages",
-        help_text="Work",
-    )
-    matiere = models.ForeignKey(
-        Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material", null=True, blank=True
-    )
-    quantite_utilisee = models.PositiveIntegerField(
-        default=1, help_text="Quantity used in the work"
-    )
-    source = models.CharField(null=True, choices=SOURCE_CHOICES, help_text="Material usage source, stock or client")
-    is_deleted = models.BooleanField(default=False, help_text="Material usage deleted")
-    deleted_at = models.DateTimeField(
-        null=True, blank=True, help_text="Date when the material usage was deleted"
-    )
+#     travaux = models.ForeignKey(
+#         "Traveaux",
+#         on_delete=models.CASCADE,
+#         related_name="matiere_usages",
+#         help_text="Work",
+#     )
+#     matiere = models.ForeignKey(
+#         Matiere, on_delete=models.CASCADE, related_name="usages", help_text="Material", null=True, blank=True
+#     )
+#     quantite_utilisee = models.PositiveIntegerField(
+#         default=1, help_text="Quantity used in the work"
+#     )
+#     source = models.CharField(null=True, choices=SOURCE_CHOICES, help_text="Material usage source, stock or client")
+#     is_deleted = models.BooleanField(default=False, help_text="Material usage deleted")
+#     deleted_at = models.DateTimeField(
+#         null=True, blank=True, help_text="Date when the material usage was deleted"
+#     )
 
-    # class Meta:
-        # unique_together = ("travaux", "matiere")
+#     # class Meta:
+#         # unique_together = ("travaux", "matiere")
 
-    def __str__(self):
-        name = self.matiere or self.achat
-        return f"{name} - {self.quantite_utilisee} units for {self.travaux}"
+#     def __str__(self):
+#         name = self.matiere or self.achat
+#         return f"{name} - {self.quantite_utilisee} units for {self.travaux}"
 
-    # def save(self, *args, **kwargs):
-    #     # Check if this is a new instance being created
-    #     if not self.pk:
-    #         # Update material quantity
-    #         if self.source == "client" and self.matiere:
-    #             success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
-    #         elif self.source == "stock" and self.achat:
-    #             success = self.achat.update_quantity_after_usage(self.quantite_utilisee)
-    #         if not success:
-    #             from django.core.exceptions import ValidationError
+#     # def save(self, *args, **kwargs):
+#     #     # Check if this is a new instance being created
+#     #     if not self.pk:
+#     #         # Update material quantity
+#     #         if self.source == "client" and self.matiere:
+#     #             success = self.matiere.update_quantity_after_usage(self.quantite_utilisee)
+#     #         elif self.source == "stock" and self.achat:
+#     #             success = self.achat.update_quantity_after_usage(self.quantite_utilisee)
+#     #         if not success:
+#     #             from django.core.exceptions import ValidationError
 
-    #             raise ValidationError(
-    #                 f"Insufficient quantity available for {self.matiere}. "
-    #                 f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
-    #             )
-    #     super().save(*args, **kwargs)
-
-
-class Traveaux(models.Model):
-    client = models.ForeignKey(
-        Client, on_delete=models.CASCADE, related_name="travaux", help_text="Client"
-    )
-    produit = models.ForeignKey(
-        Produit, on_delete=models.CASCADE, related_name="travaux", help_text="Product"
-    )
-    matieres = models.ManyToManyField(
-        Matiere,
-        through=MatiereUsage,
-        related_name="travaux",
-        help_text="Materials used",
-    )
-    duree = models.PositiveIntegerField(
-        help_text="Duration of the work in hours",
-    )
-    quantite = models.FloatField(
-        default=1, help_text="Quantity of the product used for the work"
-    )
-    remise_produit = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0,
-        help_text="Discount value applied on this product"
-    )
-    remise_percent_produit = models.DecimalField(
-        max_digits=5, decimal_places=2, default=0,
-        help_text="Percentage discount on this product"
-    )
-    description = models.TextField(blank=True, null=True, help_text="Work description")
-
-    date_creation = models.DateTimeField(
-        auto_now_add=True, help_text="Date when the work was created"
-    )
-    derniere_mise_a_jour = models.DateTimeField(
-        auto_now=True, help_text="Date when the work was last updated"
-    )
-    is_deleted = models.BooleanField(default=False, help_text="Work deleted")
-    deleted_at = models.DateTimeField(
-        null=True, blank=True, help_text="Date when the work was deleted"
-    )
-    remise = models.FloatField(
-        default=0,
-        help_text="Remise appliquée sur le travail (en DT)"
-    )
-    class Meta:
-        indexes = [
-            models.Index(fields=["client"]),
-            models.Index(fields=["produit"]),
-            models.Index(fields=["duree"]),
-        ]
-
-    def __str__(self):
-        return f"Travail pour {self.client.nom_client} - {self.produit.nom_produit}"
+#     #             raise ValidationError(
+#     #                 f"Insufficient quantity available for {self.matiere}. "
+#     #                 f"Available: {self.matiere.remaining_quantity}, Requested: {self.quantite_utilisee}"
+#     #             )
+#     #     super().save(*args, **kwargs)
 
 
-class FactureTravaux(models.Model):
+# class Traveaux(models.Model):
+#     client = models.ForeignKey(
+#         Client, on_delete=models.CASCADE, related_name="travaux", help_text="Client"
+#     )
+#     produit = models.ForeignKey(
+#         Produit, on_delete=models.CASCADE, related_name="travaux", help_text="Product"
+#     )
+#     matieres = models.ManyToManyField(
+#         Matiere,
+#         through=MatiereUsage,
+#         related_name="travaux",
+#         help_text="Materials used",
+#     )
+#     duree = models.PositiveIntegerField(
+#         help_text="Duration of the work in hours",
+#     )
+#     quantite = models.FloatField(
+#         default=1, help_text="Quantity of the product used for the work"
+#     )
+#     remise_produit = models.DecimalField(
+#         max_digits=10, decimal_places=2, default=0,
+#         help_text="Discount value applied on this product"
+#     )
+#     remise_percent_produit = models.DecimalField(
+#         max_digits=5, decimal_places=2, default=0,
+#         help_text="Percentage discount on this product"
+#     )
+#     description = models.TextField(blank=True, null=True, help_text="Work description")
+
+#     date_creation = models.DateTimeField(
+#         auto_now_add=True, help_text="Date when the work was created"
+#     )
+#     derniere_mise_a_jour = models.DateTimeField(
+#         auto_now=True, help_text="Date when the work was last updated"
+#     )
+#     is_deleted = models.BooleanField(default=False, help_text="Work deleted")
+#     deleted_at = models.DateTimeField(
+#         null=True, blank=True, help_text="Date when the work was deleted"
+#     )
+#     remise = models.FloatField(
+#         default=0,
+#         help_text="Remise appliquée sur le travail (en DT)"
+#     )
+#     class Meta:
+#         indexes = [
+#             models.Index(fields=["client"]),
+#             models.Index(fields=["produit"]),
+#             models.Index(fields=["duree"]),
+#         ]
+
+#     def __str__(self):
+#         return f"Travail pour {self.client.nom_client} - {self.produit.nom_produit}"
+
+
+class FactureProduits(models.Model):
     STATUT_CHOICES = [
         ("draft", "Brouillon"),
         ("sent", "Envoyée"),
@@ -474,8 +474,8 @@ class FactureTravaux(models.Model):
     client = models.ForeignKey(
         Client, on_delete=models.CASCADE, related_name="factures", help_text="Client"
     )
-    travaux = models.ManyToManyField(
-        "Traveaux", related_name="factures", help_text="Work items included in invoice"
+    produits = models.ManyToManyField(
+        "Produits", related_name="factures", help_text="Work items included in invoice"
     )
 
     date_emission = models.DateField(help_text="Invoice generation date")
@@ -545,12 +545,12 @@ class FactureTravaux(models.Model):
         total_remise = Decimal("0.0")
         total_ht = Decimal("0.0")
 
-        for travail in self.travaux.select_related("produit").prefetch_related("matiere_usages__matiere"):
+        for produit in self.produits:
 
-            if travail.produit and travail.produit.prix is not None:
-                prix_unitaire = Decimal(travail.produit.prix)
-                quantite = Decimal(travail.quantite)
-                remise_percent = Decimal(travail.remise_percent_produit or 0)
+            if produit and produit.prix is not None:
+                prix_unitaire = Decimal(produit.prix)
+                quantite = Decimal(quantite)
+                remise_percent = Decimal(remise_percent_produit or 0)
 
                 line_total_brut = prix_unitaire * quantite
                 remise_value = (line_total_brut * remise_percent / Decimal("100")).quantize(Decimal("0.001"), rounding=ROUND_HALF_UP)
@@ -560,11 +560,12 @@ class FactureTravaux(models.Model):
                 total_remise += remise_value
                 total_ht += line_total_ht
 
-            for usage in travail.matiere_usages.all():
-                if usage.matiere and usage.matiere.prix_unitaire is not None:
-                    pu = Decimal(usage.matiere.prix_unitaire)
-                    qte = Decimal(usage.quantite_utilisee)
-                    total_ht += pu * qte
+            # A supprimer
+            # for usage in travail.matiere_usages.all():
+            #     if usage.matiere and usage.matiere.prix_unitaire is not None:
+            #         pu = Decimal(usage.matiere.prix_unitaire)
+            #         qte = Decimal(usage.quantite_utilisee)
+            #         total_ht += pu * qte
         tax_rate = Decimal(self.tax_rate or 0)
 
         # Facture ou avoir-facture ou avoir
@@ -592,9 +593,9 @@ class FactureTravaux(models.Model):
 
         super().save(*args, **kwargs)  # Save first (generates PK if new)
 
-        if (is_new and self.travaux.exists()) or (
+        if (is_new and self.produits.exists()) or (
             not is_new and self.montant_ht is None
-        ):  # Recalculate if new and travaux exist, or if totals are None
+        ):  # Recalculate if new and produits exist, or if totals are None
             self.calculate_totals()
 
             if (
@@ -642,8 +643,8 @@ class Entreprise(models.Model):
     )
 
 
-class FactureMatiere(models.Model):
-    """Model for material reception BON DE RECEPTION"""
+class FactureProduit(models.Model):
+    """Model for product reception BON DE RECEPTION"""
 
     numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
     client = models.ForeignKey(
@@ -652,8 +653,8 @@ class FactureMatiere(models.Model):
         related_name="bons_reception",
         help_text="Client",
     )
-    matieres = models.ManyToManyField(
-        Matiere, related_name="bons_reception", help_text="Received materials"
+    produits = models.ManyToManyField(
+        Produit, related_name="bons_reception", help_text="Received products"
     )
     date_reception = models.DateField(help_text="Reception date")
     notes = models.TextField(blank=True, null=True, help_text="Additional notes")
@@ -713,7 +714,7 @@ class FactureMatiere(models.Model):
 
 
 class BonRetour(models.Model):
-    """Model for material return BON DE RETOUR"""
+    """Model for product return BON DE RETOUR"""
 
     numero_bon = models.CharField(max_length=50, unique=True, help_text="Bon number")
     client = models.ForeignKey(
@@ -772,27 +773,27 @@ class BonRetour(models.Model):
         super().save(*args, **kwargs)
 
 
-class MatiereRetour(models.Model):
+class ProduitRetour(models.Model):
     bon_retour = models.ForeignKey(
-        "BonRetour", on_delete=models.CASCADE, related_name="matiere_retours"
+        "BonRetour", on_delete=models.CASCADE, related_name="produit_retours"
     )
-    matiere = models.ForeignKey( 
-        Matiere, on_delete=models.CASCADE, related_name="retours" , null=True , blank=True
+    produit = models.ForeignKey( 
+        Produit, on_delete=models.CASCADE, related_name="retours" , null=True , blank=True
     )
-    nom_matiere = models.CharField(max_length=255, null=True, blank=True)
+    nom_produit = models.CharField(max_length=255, null=True, blank=True)
     quantite_retournee = models.PositiveIntegerField(
-        default=1, help_text="Quantity of material returned"
+        default=1, help_text="Quantity of product returned"
     )
-    is_deleted = models.BooleanField(default=False, help_text="Material returned deleted")
+    is_deleted = models.BooleanField(default=False, help_text="Product returned deleted")
     deleted_at = models.DateTimeField(
-        null=True, blank=True, help_text="Date when the material returned was deleted"
+        null=True, blank=True, help_text="Date when the product returned was deleted"
     )
 
     class Meta:
         pass
 
     def __str__(self):
-        return f"{self.quantite_retournee} of {self.matiere.type_matiere} for Bon Retour {self.bon_retour.numero_bon}"
+        return f"{self.quantite_retournee} of {self.produit.nom_produit} for Bon Retour {self.bon_retour.numero_bon}"
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -1333,7 +1334,7 @@ class Commande(models.Model):
         if self.statut != "completed" or self.facture is not None:
             return None
 
-        facture = FactureTravaux.objects.create(
+        facture = FactureProduits.objects.create(
             numero_facture=f"FAC-{self.numero_commande}",
             client=self.client,
             date_emission=self.derniere_mise_a_jour.date(),
@@ -1665,7 +1666,7 @@ class Cd(models.Model):
         Client, on_delete=models.CASCADE, related_name="cd", help_text="Client"
     )
     facture = models.OneToOneField(
-        FactureTravaux,
+        FactureProduits,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -1730,7 +1731,7 @@ class Cd(models.Model):
         help_text="Total amount including tax",
     )
     bons = models.ManyToManyField(
-        FactureTravaux,
+        FactureProduits,
         blank=True,
         related_name="commandes_associees",
         help_text="Liste des bons liés à cette commande"
@@ -1848,7 +1849,7 @@ class Cd(models.Model):
             return None
 
         # Create invoice.
-        facture = FactureTravaux.objects.create(
+        facture = FactureProduits.objects.create(
             numero_facture=f"FAC-{self.numero_commande}",
             client=self.client,
             date_emission=self.derniere_mise_a_jour.date(),
@@ -1884,7 +1885,7 @@ class PdC(models.Model):
         related_name="cd_produits",
         help_text="Product",
     )
-    bon_id = models.ForeignKey(FactureTravaux, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
+    bon_id = models.ForeignKey(FactureProduits, null=True, blank=True, on_delete=models.SET_NULL, related_name="produits_utilises")
     bon_numero = models.CharField(max_length=100, null=True, blank=True)
     quantite = models.PositiveIntegerField(default=1, help_text="Product quantity")
     prix_unitaire = models.FloatField(
@@ -1962,7 +1963,7 @@ class MatierePurchase(models.Model):
     #         self.remaining_quantity = self.quantite
     #     super().save(*args, **kwargs)
 
-class FactureAchatMatiere(models.Model):
+class FactureAchatProduit(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
     fournisseur = models.CharField(max_length=255, blank=True, null=True)
 
@@ -1988,7 +1989,7 @@ class FactureAchatMatiere(models.Model):
 
 
 class Achat(models.Model):
-    facture = models.ForeignKey(FactureAchatMatiere, on_delete=models.CASCADE, related_name='achats')
+    facture = models.ForeignKey(FactureAchatProduit, on_delete=models.CASCADE, related_name='achats')
     nom = models.CharField(max_length=255)
     prix = models.DecimalField(max_digits=10, decimal_places=2)
     quantite = models.PositiveIntegerField()
@@ -1998,7 +1999,7 @@ class Achat(models.Model):
 
 from django.db import models
 
-class BonLivraisonMatiere(models.Model):
+class BonLivraisonProduit(models.Model):
     numero = models.CharField(max_length=100, blank=True, null=True)
     fournisseur = models.CharField(max_length=255, blank=True, null=True)
 
@@ -2011,7 +2012,7 @@ class BonLivraisonMatiere(models.Model):
 
 
 class Livraison(models.Model):
-    bon = models.ForeignKey(BonLivraisonMatiere, on_delete=models.CASCADE, related_name='livraisons')
+    bon = models.ForeignKey(BonLivraisonProduit, on_delete=models.CASCADE, related_name='livraisons')
     nom = models.CharField(max_length=255)
     prix = models.DecimalField(max_digits=10, decimal_places=2)
     quantite = models.PositiveIntegerField()
@@ -2075,20 +2076,20 @@ class BonRetourFournisseur(models.Model):
     deleted_at = models.DateTimeField(null=True, blank=True)
 
 
-class MatiereRetourFournisseur(models.Model):
+class ProduitRetourFournisseur(models.Model):
     bon_retour = models.ForeignKey(
         BonRetourFournisseur,
         on_delete=models.CASCADE,
         related_name="matiere_retours",
     )
-    matiere = models.ForeignKey(
-        Matiere,
+    produit = models.ForeignKey(
+        Produit,
         on_delete=models.CASCADE,
         related_name="retours_fournisseur",
         null=True,
         blank=True,
     )
-    nom_matiere = models.CharField(max_length=255, null=True, blank=True)
+    nom_produit = models.CharField(max_length=255, null=True, blank=True)
     quantite_retournee = models.PositiveIntegerField(default=1)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
@@ -2106,7 +2107,7 @@ class PlanTraiteFournisseur(models.Model):
     ]
 
     facture = models.OneToOneField(
-        'FactureAchatMatiere', on_delete=models.CASCADE, null=True, blank=True
+        'FactureAchatProduit', on_delete=models.CASCADE, null=True, blank=True
     )
     fournisseur = models.ForeignKey(
         "Fournisseur", on_delete=models.SET_NULL, null=True, blank=True
