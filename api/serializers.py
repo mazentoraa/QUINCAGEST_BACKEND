@@ -1,51 +1,52 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage, Entreprise
+from .models import Client, Traveaux, Produit, Produit, ProduitUsage, Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
-from .models import MatierePremiereAchat
+from .models import ProduitPremiereAchat
 from decimal import Decimal
 
-class MatiereSerializer(serializers.ModelSerializer):
-    client_id = serializers.PrimaryKeyRelatedField(
-        queryset=Client.objects.all(), source="client"
-    )
-    client_name = serializers.CharField(source="client.nom_client", read_only=True)
-    prix_unitaire = serializers.FloatField(required=False)
+# A supprimer
+# class ProduitSerializer(serializers.ModelSerializer):
+#     client_id = serializers.PrimaryKeyRelatedField(
+#         queryset=Client.objects.all(), source="client"
+#     )
+#     client_name = serializers.CharField(source="client.nom_client", read_only=True)
+#     prix_unitaire = serializers.FloatField(required=False)
 
-    class Meta:
-        model = Matiere
-        fields = (
-            "id",
-            "numero_bon",
-            "type_matiere",
-            "reception_date",
-            "client_name",
-            "client_id",
-            "description",
-            "prix_unitaire",
-            "date_creation",
-            "quantite",
-            "remaining_quantity",  # ✅ doit rester ici
-            "derniere_mise_a_jour",
-            "width",
-            "length",
-            "thickness",
-            "surface",
-        )
-        extra_kwargs = {
-            "type_matiere": {"required": True},
-            "description": {"required": False},
-            "prix_unitaire": {"required": False},
-            "client_id": {"required": True},
-            "numero_bon": {"required": False, "allow_null": True, "allow_blank": True},
-            "quantite": {"required": True},
-            "remaining_quantity": {"required": False},  # ✅ autorisé en écriture
-        }
-        read_only_fields = (
-            "date_creation",
-            "derniere_mise_a_jour",
+#     class Meta:
+#         model = Produit
+#         fields = (
+#             "id",
+#             "numero_bon",
+#             "nom_produit",
+#             "reception_date",
+#             "client_name",
+#             "client_id",
+#             "description",
+#             "prix_unitaire",
+#             "date_creation",
+#             "quantite",
+#             "remaining_quantity",  
+#             "derniere_mise_a_jour",
+#             "width",
+#             "length",
+#             "thickness",
+#             "surface",
+#         )
+#         extra_kwargs = {
+#             "type_produit": {"required": True},
+#             "description": {"required": False},
+#             "prix_unitaire": {"required": False},
+#             "client_id": {"required": True},
+#             "numero_bon": {"required": False, "allow_null": True, "allow_blank": True},
+#             "quantite": {"required": True},
+#             "remaining_quantity": {"required": False},  # ✅ autorisé en écriture
+#         }
+#         read_only_fields = (
+#             "date_creation",
+#             "derniere_mise_a_jour",
           
-        )
+#         )
 
 
 from rest_framework import serializers
@@ -61,7 +62,7 @@ class ProduitSerializer(serializers.ModelSerializer):
             "id",
             "nom_produit",
             "description",
-            "type_matiere",
+            "type_produit",
             "prix",
             "image",
             "epaisseur",
@@ -102,191 +103,191 @@ class ClientSerializer(serializers.ModelSerializer):
                 )
             return value
 
+# # A supprimer
+# class ProduitUsageSerializer(serializers.ModelSerializer):
+#     produit_id = serializers.IntegerField(write_only=True) # To acccept
+#     material_id = serializers.SerializerMethodField(read_only=True) # to return
 
-class MatiereUsageSerializer(serializers.ModelSerializer):
-    matiere_id = serializers.IntegerField(write_only=True) # To acccept
-    material_id = serializers.SerializerMethodField(read_only=True) # to return
+#     class Meta:
+#         model = ProduitUsage
+#         fields = ("produit_id", "material_id", "quantite_utilisee", "source")
 
-    class Meta:
-        model = MatiereUsage
-        fields = ("matiere_id", "material_id", "quantite_utilisee", "source")
-
-    def get_material_id(self, obj):
-        if obj.source == "client" and obj.matiere:
-            return obj.matiere.id
-        elif obj.source == "stock" and obj.achat:
-            return obj.achat.id
-        return None
+#     def get_material_id(self, obj):
+#         if obj.source == "client" and obj.produit:
+#             return obj.produit.id
+#         elif obj.source == "stock" and obj.achat:
+#             return obj.achat.id
+#         return None
 
 
-class TraveauxSerializer(serializers.ModelSerializer):
-    client_id = serializers.IntegerField()
-    produit_id = serializers.IntegerField()
-    client_name = serializers.CharField(source="client.nom_client", read_only=True)
-    produit_name = serializers.CharField(source="produit.nom_produit", read_only=True)
-    matiere_usages = MatiereUsageSerializer(many=True, required=False)
-    remise = serializers.FloatField(required=False, default=0)
+# class TraveauxSerializer(serializers.ModelSerializer):
+#     client_id = serializers.IntegerField()
+#     produit_id = serializers.IntegerField()
+#     client_name = serializers.CharField(source="client.nom_client", read_only=True)
+#     produit_name = serializers.CharField(source="produit.nom_produit", read_only=True)
+#     produit_usages = ProduitUsageSerializer(many=True, required=False)
+#     remise = serializers.FloatField(required=False, default=0)
 
-    class Meta:
-        model = Traveaux
-        fields = (
-            "id",
-            "client_id",
-            "produit_id",
-            "client_name",
-            "produit_name",
-            "duree",
-            "quantite",
-            "description",
-            "date_creation",
-            "matiere_usages",
-            "derniere_mise_a_jour",
-            "remise",
-        )
-        read_only_fields = (
-            "date_creation",
-            "derniere_mise_a_jour",
-            "client_name",
-            "produit_name",
-        )
-        extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True},"remise": {"required": False, "default": 0},}
+#     class Meta:
+#         model = Traveaux
+#         fields = (
+#             "id",
+#             "client_id",
+#             "produit_id",
+#             "client_name",
+#             "produit_name",
+#             "duree",
+#             "quantite",
+#             "description",
+#             "date_creation",
+#             "produit_usages",
+#             "derniere_mise_a_jour",
+#             "remise",
+#         )
+#         read_only_fields = (
+#             "date_creation",
+#             "derniere_mise_a_jour",
+#             "client_name",
+#             "produit_name",
+#         )
+#         extra_kwargs = {"duree": {"required": True}, "quantite": {"required": True},"remise": {"required": False, "default": 0},}
 
-    @transaction.atomic
-    def create(self, validated_data):
-        print("🔥 Validated Data:", validated_data)
-        client_id = validated_data.pop("client_id")
-        produit_id = validated_data.pop("produit_id")
-        matiere_usages_data = validated_data.pop("matiere_usages", [])
+#     @transaction.atomic
+#     def create(self, validated_data):
+#         print("🔥 Validated Data:", validated_data)
+#         client_id = validated_data.pop("client_id")
+#         produit_id = validated_data.pop("produit_id")
+#         produit_usages_data = validated_data.pop("produit_usages", [])
 
-        try:
-            client = Client.objects.get(pk=client_id)
-            produit = Produit.objects.get(pk=produit_id)
-            validated_data["client"] = client
-            validated_data["produit"] = produit
-        except (Client.DoesNotExist, Produit.DoesNotExist):
-            raise serializers.ValidationError("Client or Product not found")
+#         try:
+#             client = Client.objects.get(pk=client_id)
+#             produit = Produit.objects.get(pk=produit_id)
+#             validated_data["client"] = client
+#             validated_data["produit"] = produit
+#         except (Client.DoesNotExist, Produit.DoesNotExist):
+#             raise serializers.ValidationError("Client or Product not found")
 
-        travaux = Traveaux.objects.create(**validated_data)
+#         travaux = Traveaux.objects.create(**validated_data)
 
-        # Process material usage
-        for matiere_usage_data in matiere_usages_data:
-            matiere_id = matiere_usage_data.get("matiere_id")
-            quantite_utilisee = Decimal(matiere_usage_data.get("quantite_utilisee"))
-            source = matiere_usage_data.get("source", "stock")  # Default to main stock
+#         # Process material usage
+#         for produit_usage_data in produit_usages_data:
+#             produit_id = produit_usage_data.get("produit_id")
+#             quantite_utilisee = Decimal(produit_usage_data.get("quantite_utilisee"))
+#             source = produit_usage_data.get("source", "stock")  # Default to main stock
 
-            if source == "client":
-                try:
-                    matiere = Matiere.objects.get(pk=matiere_id)
+#             if source == "client":
+#                 try:
+#                     produit = Produit.objects.get(pk=produit_id)
 
-                    # Check if we have enough quantity
-                    if matiere.remaining_quantity < quantite_utilisee:
-                        raise serializers.ValidationError(
-                            f"Not enough material available. Only {matiere.remaining_quantity} units of {matiere.type_matiere} remaining."
-                        )
+#                     # Check if we have enough quantity
+#                     if produit.remaining_quantity < quantite_utilisee:
+#                         raise serializers.ValidationError(
+#                             f"Not enough material available. Only {produit.remaining_quantity} units of {produit.type_produit} remaining."
+#                         )
 
-                    # Create the usage record
-                    MatiereUsage.objects.create(
-                        travaux=travaux,
-                        matiere=matiere,
-                        quantite_utilisee=quantite_utilisee,
-                        source=source
-                    )
+#                     # Create the usage record
+#                     ProduitUsage.objects.create(
+#                         travaux=travaux,
+#                         produit=produit,
+#                         quantite_utilisee=quantite_utilisee,
+#                         source=source
+#                     )
 
-                    # Update the remaining quantity
-                    matiere.remaining_quantity -= quantite_utilisee
-                    matiere.save()
+#                     # Update the remaining quantity
+#                     produit.remaining_quantity -= quantite_utilisee
+#                     produit.save()
 
-                except Matiere.DoesNotExist:
-                    raise serializers.ValidationError(
-                        f"Material with ID {matiere_id} not found"
-                    )
-            elif source == "stock":
-                try:
-                    achat = MatierePremiereAchat.objects.get(pk=matiere_id)
-                    if achat.remaining_quantity < quantite_utilisee:
-                        raise serializers.ValidationError(
-                            f"Not enough stock: {achat.remaining_quantity} remaining for {achat.nom_matiere}"
-                        )
-                    achat.remaining_quantity -= quantite_utilisee
-                    achat.save()
+#                 except Produit.DoesNotExist:
+#                     raise serializers.ValidationError(
+#                         f"Product with ID {produit_id} not found"
+#                     )
+#             elif source == "stock":
+#                 try:
+#                     achat = ProduitPremiereAchat.objects.get(pk=produit_id)
+#                     if achat.remaining_quantity < quantite_utilisee:
+#                         raise serializers.ValidationError(
+#                             f"Not enough stock: {achat.remaining_quantity} remaining for {achat.nom_produit}"
+#                         )
+#                     achat.remaining_quantity -= quantite_utilisee
+#                     achat.save()
 
-                    MatiereUsage.objects.create(
-                        travaux=travaux,
-                        quantite_utilisee=quantite_utilisee,
-                        source=source,
-                        achat_id=achat.id 
-                    )
+#                     ProduitUsage.objects.create(
+#                         travaux=travaux,
+#                         quantite_utilisee=quantite_utilisee,
+#                         source=source,
+#                         achat_id=achat.id 
+#                     )
 
-                except MatierePremiereAchat.DoesNotExist:
-                    raise serializers.ValidationError(f"Stock material with ID {matiere_id} not found")
+#                 except ProduitPremiereAchat.DoesNotExist:
+#                     raise serializers.ValidationError(f"Stock material with ID {produit_id} not found")
 
-        return travaux
+#         return travaux
     
-    def update(self, instance, validated_data):
-        if "matiere_usages" in validated_data:
-            matiere_usages_data = validated_data.pop("matiere_usages")
+#     def update(self, instance, validated_data):
+#         if "produit_usages" in validated_data:
+#             produit_usages_data = validated_data.pop("produit_usages")
 
-            # Reset quantities for existing usages first
-            for usage in instance.matiere_usages.all():
-                if usage.source == "client" and usage.matiere:
-                    usage.matiere.remaining_quantity += usage.quantite_utilisee
-                    usage.matiere.save()
-                elif usage.source == "stock" and usage.achat:
-                    usage.achat.remaining_quantity += usage.quantite_utilisee
-                    usage.achat.save()
-                usage.delete()
+#             # Reset quantities for existing usages first
+#             for usage in instance.produit_usages.all():
+#                 if usage.source == "client" and usage.produit:
+#                     usage.produit.remaining_quantity += usage.quantite_utilisee
+#                     usage.produit.save()
+#                 elif usage.source == "stock" and usage.achat:
+#                     usage.achat.remaining_quantity += usage.quantite_utilisee
+#                     usage.achat.save()
+#                 usage.delete()
 
-            # Re-add new usages
-            for usage_data in matiere_usages_data:
-                source = usage_data.get("source", "stock")
-                matiere_id = usage_data.get("matiere_id")
-                quantite_utilisee = usage_data.get("quantite_utilisee")
+#             # Re-add new usages
+#             for usage_data in produit_usages_data:
+#                 source = usage_data.get("source", "stock")
+#                 produit_id = usage_data.get("produit_id")
+#                 quantite_utilisee = usage_data.get("quantite_utilisee")
 
-                if source == "client":
-                    try:
-                        matiere = Matiere.objects.get(pk=matiere_id)
-                        if matiere.remaining_quantity < quantite_utilisee:
-                            raise serializers.ValidationError(
-                                f"Not enough client material. Only {matiere.remaining_quantity} units left of {matiere.type_matiere}."
-                            )
+#                 if source == "client":
+#                     try:
+#                         produit = Produit.objects.get(pk=produit_id)
+#                         if produit.remaining_quantity < quantite_utilisee:
+#                             raise serializers.ValidationError(
+#                                 f"Not enough client material. Only {produit.remaining_quantity} units left of {produit.type_produit}."
+#                             )
 
-                        MatiereUsage.objects.create(
-                            travaux=instance,
-                            matiere=matiere,
-                            quantite_utilisee=quantite_utilisee,
-                            source=source,
-                        )
+#                         ProduitUsage.objects.create(
+#                             travaux=instance,
+#                             produit=produit,
+#                             quantite_utilisee=quantite_utilisee,
+#                             source=source,
+#                         )
 
-                        matiere.remaining_quantity -= quantite_utilisee
-                        matiere.save()
-                    except Matiere.DoesNotExist:
-                        raise serializers.ValidationError(
-                            f"Client material with ID {matiere_id} not found."
-                        )
+#                         produit.remaining_quantity -= quantite_utilisee
+#                         produit.save()
+#                     except Produit.DoesNotExist:
+#                         raise serializers.ValidationError(
+#                             f"Client material with ID {produit_id} not found."
+#                         )
 
-                elif source == "stock":
-                    try:
-                        achat = MatierePremiereAchat.objects.get(pk=matiere_id)
-                        if achat.remaining_quantity < quantite_utilisee:
-                            raise serializers.ValidationError(
-                                f"Not enough stock material. Only {achat.remaining_quantity} units left of {achat.nom_matiere}."
-                            )
+#                 elif source == "stock":
+#                     try:
+#                         achat = ProduitPremiereAchat.objects.get(pk=produit_id)
+#                         if achat.remaining_quantity < quantite_utilisee:
+#                             raise serializers.ValidationError(
+#                                 f"Not enough stock material. Only {achat.remaining_quantity} units left of {achat.nom_produit}."
+#                             )
 
-                        MatiereUsage.objects.create(
-                            travaux=instance,
-                            achat=achat,
-                            quantite_utilisee=quantite_utilisee,
-                            source=source,
-                        )
+#                         ProduitUsage.objects.create(
+#                             travaux=instance,
+#                             achat=achat,
+#                             quantite_utilisee=quantite_utilisee,
+#                             source=source,
+#                         )
 
-                        achat.remaining_quantity -= quantite_utilisee
-                        achat.save()
-                    except MatierePremiereAchat.DoesNotExist:
-                        raise serializers.ValidationError(
-                            f"Stock material with ID {matiere_id} not found."
-                        )
+#                         achat.remaining_quantity -= quantite_utilisee
+#                         achat.save()
+#                     except ProduitPremiereAchat.DoesNotExist:
+#                         raise serializers.ValidationError(
+#                             f"Stock material with ID {produit_id} not found."
+#                         )
 
-        return super().update(instance, validated_data)
+#         return super().update(instance, validated_data)
 
 
 class EntrepriseSerializer(serializers.ModelSerializer):
@@ -294,13 +295,14 @@ class EntrepriseSerializer(serializers.ModelSerializer):
         model = Entreprise
         fields = "__all__"
 
-class MatierePremiereAchatSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MatierePremiereAchat
-        fields = '__all__'
+# A supprimer
+# class ProduitAchatSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ProduitAchat
+#         fields = '__all__'
 
 from rest_framework import serializers
-from .models import FactureAchatMatiere, Achat
+from .models import FactureAchatProduit, Achat
 
 
 class AchatSerializer(serializers.ModelSerializer):
@@ -309,16 +311,16 @@ class AchatSerializer(serializers.ModelSerializer):
         fields = ['id', 'nom', 'prix', 'quantite']
 
 
-class FactureAchatMatiereSerializer(serializers.ModelSerializer):
+class FactureAchatProduitSerializer(serializers.ModelSerializer):
     achats = AchatSerializer(many=True)
 
     class Meta:
-        model = FactureAchatMatiere
+        model = FactureAchatProduit
         fields = ['id', 'numero', 'fournisseur','mode_paiement', 'mixte_comptant', 'prix_total', 'date_facture', 'achats']
 
     def create(self, validated_data):
         achats_data = validated_data.pop('achats', [])
-        facture = FactureAchatMatiere.objects.create(**validated_data)
+        facture = FactureAchatProduit.objects.create(**validated_data)
         for achat_data in achats_data:
             Achat.objects.create(facture=facture, **achat_data)
         return facture
@@ -342,7 +344,7 @@ class FactureAchatMatiereSerializer(serializers.ModelSerializer):
 
 
 
-from .models import BonLivraisonMatiere, Livraison
+from .models import BonLivraisonProduit, Livraison
 
 
 class LivraisonSerializer(serializers.ModelSerializer):
@@ -351,16 +353,16 @@ class LivraisonSerializer(serializers.ModelSerializer):
         fields = ['id', 'nom', 'prix', 'quantite']
 
 
-class BonLivraisonMatiereSerializer(serializers.ModelSerializer):
+class BonLivraisonProduitSerializer(serializers.ModelSerializer):
     livraisons = LivraisonSerializer(many=True)
 
     class Meta:
-        model = BonLivraisonMatiere
+        model = BonLivraisonProduit
         fields = ['id', 'numero', 'fournisseur', 'prix_total', 'date_livraison', 'livraisons']
 
     def create(self, validated_data):
         livraisons_data = validated_data.pop('livraisons', [])
-        bon = BonLivraisonMatiere.objects.create(**validated_data)
+        bon = BonLivraisonProduit.objects.create(**validated_data)
         for livraison_data in livraisons_data:
             Livraison.objects.create(bon=bon, **livraison_data)
         return bon
@@ -399,24 +401,24 @@ class ConsommableSerializer(serializers.ModelSerializer):
 
 
 from rest_framework import serializers
-from .models import BonRetourFournisseur, MatiereRetourFournisseur, Matiere, Fournisseur
+from .models import BonRetourFournisseur, ProduitRetourFournisseur, Produit, Fournisseur
 
 
-class MatiereForRetourFournisseurSerializer(serializers.ModelSerializer):
+class ProduitForRetourFournisseurSerializer(serializers.ModelSerializer):
     """Serializer for materials available for return to fournisseur"""
 
-    nom_matiere = serializers.CharField()
+    nom_produit = serializers.CharField()
     quantite_retournee = serializers.IntegerField(min_value=1)
 
     class Meta:
-        model = Matiere
+        model = Produit
         fields = [
-            "nom_matiere",
+            "nom_produit",
             "quantite_retournee",
         ]
         read_only_fields = [
             "id",
-            "type_matiere",
+            # "type_produit",
             "description",
             "thickness",
             "length",
@@ -434,34 +436,34 @@ class MatiereForRetourFournisseurSerializer(serializers.ModelSerializer):
         return value
 
 
-class MatiereRetourFournisseurFreeSerializer(serializers.Serializer):
-    nom_matiere = serializers.CharField()
+class ProduitRetourFournisseurFreeSerializer(serializers.Serializer):
+    nom_produit = serializers.CharField()
     quantite_retournee = serializers.IntegerField(min_value=1)
 
     class Meta:
-        model = MatiereRetourFournisseur
-        fields = ["id", "matiere_id", "matiere_details", "quantite_retournee"]
+        model = ProduitRetourFournisseur
+        fields = ["id", "produit_id", "produit_details", "quantite_retournee"]
 
-    def validate_matiere_id(self, value):
+    def validate_produit_id(self, value):
         try:
-            matiere = Matiere.objects.get(id=value)
+            produit = Produit.objects.get(id=value)
             return value
-        except Matiere.DoesNotExist:
-            raise serializers.ValidationError("Material not found.")
+        except Produit.DoesNotExist:
+            raise serializers.ValidationError("Product not found.")
 
     def validate(self, attrs):
-        matiere_id = attrs.get("matiere_id")
+        produit_id = attrs.get("produit_id")
         quantite_retournee = attrs.get("quantite_retournee", 1)
 
-        if matiere_id:
+        if produit_id:
             try:
-                matiere = Matiere.objects.get(id=matiere_id)
-                if quantite_retournee > matiere.remaining_quantity:
+                produit = Produit.objects.get(id=produit_id)
+                if quantite_retournee > produit.remaining_quantity:
                     raise serializers.ValidationError({
-                        "quantite_retournee": f"Cannot return {quantite_retournee} units. Only {matiere.remaining_quantity} remaining."
+                        "quantite_retournee": f"Cannot return {quantite_retournee} units. Only {produit.remaining_quantity} remaining."
                     })
-            except Matiere.DoesNotExist:
-                raise serializers.ValidationError({"matiere_id": "Material not found."})
+            except Produit.DoesNotExist:
+                raise serializers.ValidationError({"produit_id": "Product not found."})
         return attrs
 
 
@@ -473,7 +475,7 @@ class FournisseurBasicSerializer(serializers.ModelSerializer):
 
 class BonRetourFournisseurSerializer(serializers.ModelSerializer):
     fournisseur_details = FournisseurBasicSerializer(source="fournisseur", read_only=True)
-    matiere_retours = MatiereRetourFournisseurFreeSerializer(many=True)
+    produit_retours = ProduitFournisseurFreeSerializer(many=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -491,7 +493,7 @@ class BonRetourFournisseurSerializer(serializers.ModelSerializer):
             "notes",
             "date_creation",
             "derniere_mise_a_jour",
-            "matiere_retours",
+            "produit_retours",
         ]
         read_only_fields = [
             "id",
@@ -501,28 +503,28 @@ class BonRetourFournisseurSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        matieres_data = validated_data.pop("matiere_retours", [])
+        produits_data = validated_data.pop("produit_retours", [])
         bon_retour = BonRetourFournisseur.objects.create(**validated_data)
 
-        for mat_data in matieres_data:
-            MatiereRetourFournisseur.objects.create(
+        for mat_data in produits_data:
+            ProduitRetourFournisseur.objects.create(
                 bon_retour=bon_retour,
-                nom_matiere=mat_data["nom_matiere"],
+                nom_produit=mat_data["nom_produit"],
                 quantite_retournee=mat_data["quantite_retournee"],
             )
         return bon_retour
 
     def update(self, instance, validated_data):
-        matiere_retours_data = validated_data.pop("matiere_retours", [])
+        produit_retours_data = validated_data.pop("produit_retours", [])
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        if matiere_retours_data is not None:
-            instance.matiere_retours.all().delete()
-            for mat_data in matiere_retours_data:
-                MatiereRetourFournisseur.objects.create(bon_retour=instance, **mat_data)
+        if produit_retours_data is not None:
+            instance.produit_retours.all().delete()
+            for mat_data in produit_retours_data:
+                ProduitRetourFournisseur.objects.create(bon_retour=instance, **mat_data)
 
         return instance
 
@@ -545,11 +547,11 @@ class BonRetourFournisseurListSerializer(serializers.ModelSerializer):
             "total_materials",
         ]
 
-    def get_total_materials(self, obj):
-        return obj.matiere_retours.count()
+    def get_total_products(self, obj):
+        return obj.produit_retours.count()
 
 
-class FournisseurMaterialsSerializer(serializers.ModelSerializer):
+class FournisseurProductsSerializer(serializers.ModelSerializer):
     available_materials = serializers.SerializerMethodField()
 
     class Meta:
@@ -559,15 +561,15 @@ class FournisseurMaterialsSerializer(serializers.ModelSerializer):
     def get_available_materials(self, obj):
         # Ici tu dois récupérer les matières saisies, par exemple via un filtre personnalisé
         # Si tu n'as pas de relation directe, adapte cette partie
-        # Ex: récupère toutes les MatiereRetourFournisseur des bons du fournisseur avec quantité > 0
+        # Ex: récupère toutes les ProduitRetourFournisseur des bons du fournisseur avec quantité > 0
         bons = BonRetourFournisseur.objects.filter(fournisseur=obj, is_deleted=False)
-        matieres = MatiereRetourFournisseur.objects.filter(bon_retour__in=bons, is_deleted=False)
-        # On retourne un format simplifié, par exemple nom_matiere et quantite max dispo (ou autre logique)
+        produits = ProduitRetourFournisseur.objects.filter(bon_retour__in=bons, is_deleted=False)
+        # On retourne un format simplifié, par exemple nom_produit et quantite max dispo (ou autre logique)
         # Ici on peut juste retourner toutes les matières retournées (sans déduplication)
         data = []
-        for m in matieres:
+        for m in produits:
             data.append({
-                "nom_matiere": m.nom_matiere,
+                "nom_produit": m.nom_produit,
                 "quantite_retournee": m.quantite_retournee,
             })
         return data
@@ -575,7 +577,7 @@ class FournisseurMaterialsSerializer(serializers.ModelSerializer):
 
 
 from rest_framework import serializers
-from .models import PlanTraiteFournisseur, TraiteFournisseur, FactureAchatMatiere, Fournisseur
+from .models import PlanTraiteFournisseur, TraiteFournisseur, FactureAchatProduit, Fournisseur
 
 
 class TraiteFournisseurSerializer(serializers.ModelSerializer):
@@ -620,12 +622,12 @@ class CreatePlanTraiteFournisseurSerializer(serializers.Serializer):
     bank_address = serializers.CharField(required=False, allow_blank=True)
 
     def validate_numero_facture(self, value):
-        if not FactureAchatMatiere.objects.filter(numero=value).exists():
+        if not FactureAchatProduit.objects.filter(numero=value).exists():
             raise serializers.ValidationError("La facture spécifiée n'existe pas.")
         return value
 
     def create(self, validated_data):
-        facture = FactureAchatMatiere.objects.get(numero=validated_data["numero_facture"])
+        facture = FactureAchatProduit.objects.get(numero=validated_data["numero_facture"])
         fournisseur = facture.fournisseur
 
 
