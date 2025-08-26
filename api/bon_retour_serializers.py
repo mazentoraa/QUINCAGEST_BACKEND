@@ -1,22 +1,22 @@
 from rest_framework import serializers
-from .models import BonRetour, MatiereRetour, Matiere, Client
+from .models import BonRetour, ProduitRetour, Produit, Client
 
 
-class MatiereForRetourSerializer(serializers.ModelSerializer):
-    """Serializer for materials available for return"""
+class ProduitForRetourSerializer(serializers.ModelSerializer):
+    """Serializer for products available for return"""
 
-    nom_matiere = serializers.CharField()
+    nom_produit = serializers.CharField()
     quantite_retournee = serializers.IntegerField(min_value=1)
 
     class Meta:
-        model = Matiere
+        model = Produit
         fields = [
-            "nom_matiere",
+            "nom_produit",
             "quantite_retournee",
         ]
         read_only_fields = [
             "id",
-            "type_matiere",
+            "type_produit",
             "description",
             "thickness",
             "length",
@@ -35,39 +35,39 @@ class MatiereForRetourSerializer(serializers.ModelSerializer):
         return value
 
 
-class MatiereRetourFreeSerializer(serializers.Serializer):
-    nom_matiere = serializers.CharField()
+class ProduitRetourFreeSerializer(serializers.Serializer):
+    nom_produit = serializers.CharField()
     quantite_retournee = serializers.IntegerField(min_value=1)
 
 
     class Meta:
-        model = MatiereRetour
-        fields = ["id", "matiere_id", "matiere_details", "quantite_retournee"]
+        model = ProduitRetour
+        fields = ["id", "produit_id", "produit_details", "quantite_retournee"]
 
-    def validate_matiere_id(self, value):
-        """Validate that the material exists"""
+    def validate_produit_id(self, value):
+        """Validate that the product exists"""
         try:
-            matiere = Matiere.objects.get(id=value)
+            produit = Produit.objects.get(id=value)
             return value
-        except Matiere.DoesNotExist:
-            raise serializers.ValidationError("Material not found.")
+        except Produit.DoesNotExist:
+            raise serializers.ValidationError("Product not found.")
 
     def validate(self, attrs):
         """Validate that return quantity doesn't exceed remaining quantity"""
-        matiere_id = attrs.get("matiere_id")
+        produit_id = attrs.get("produit_id")
         quantite_retournee = attrs.get("quantite_retournee", 1)
 
-        if matiere_id:
+        if produit_id:
             try:
-                matiere = Matiere.objects.get(id=matiere_id)
-                if quantite_retournee > matiere.remaining_quantity:
+                produit = Produit.objects.get(id=produit_id)
+                if quantite_retournee > produit.remaining_quantity:
                     raise serializers.ValidationError(
                         {
-                            "quantite_retournee": f"Cannot return {quantite_retournee} units. Only {matiere.remaining_quantity} remaining."
+                            "quantite_retournee": f"Cannot return {quantite_retournee} units. Only {produit.remaining_quantity} remaining."
                         }
                     )
-            except Matiere.DoesNotExist:
-                raise serializers.ValidationError({"matiere_id": "Material not found."})
+            except Produit.DoesNotExist:
+                raise serializers.ValidationError({"produit_id": "Product not found."})
 
         return attrs
 
@@ -84,7 +84,7 @@ class BonRetourSerializer(serializers.ModelSerializer):
     """Main serializer for BonRetour"""
 
     client_details = ClientBasicSerializer(source="client", read_only=True)
-    matiere_retours = MatiereRetourFreeSerializer(many=True)
+    produit_retours = ProduitRetourFreeSerializer(many=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
@@ -102,7 +102,7 @@ class BonRetourSerializer(serializers.ModelSerializer):
             "notes",
             "date_creation",
             "derniere_mise_a_jour",
-            "matiere_retours",
+            "produit_retours",
         ]
         read_only_fields = [
             "id",
@@ -112,35 +112,34 @@ class BonRetourSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        matieres_data = validated_data.pop("matiere_retours", [])
+        produits_data = validated_data.pop("produit_retours", [])
         bon_retour = BonRetour.objects.create(**validated_data)
 
-        for mat_data in matieres_data:
-            # This assumes you added nom_matiere/quantite fields to your MatiereRetour model
-            MatiereRetour.objects.create(
+        for prod_data in produits_data:
+            ProduitRetour.objects.create(
                 bon_retour=bon_retour,
-                nom_matiere=mat_data["nom_matiere"],
-                quantite_retournee=mat_data["quantite_retournee"],
+                nom_produit=prod_data["nom_produit"],
+                quantite_retournee=prod_data["quantite_retournee"],
             )
         return bon_retour
 
     def update(self, instance, validated_data):
-        """Update BonRetour and related MatiereRetour instances"""
-        matiere_retours_data = validated_data.pop("matiere_retours", [])
+        """Update BonRetour and related ProduitRetour instances"""
+        produit_retours_data = validated_data.pop("produit_retours", [])
 
         # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Handle matiere_retours update
-        if matiere_retours_data is not None:
+        # Handle produit_retours update
+        if produit_retours_data is not None:
             # Clear existing relations
-            instance.matiere_retours.all().delete()
+            instance.produit_retours.all().delete()
 
             # Create new relations
-            for matiere_retour_data in matiere_retours_data:
-                MatiereRetour.objects.create(bon_retour=instance, **matiere_retour_data)
+            for produit_retour_data in produit_retours_data:
+                ProduitRetour.objects.create(bon_retour=instance, **produit_retour_data)
 
         return instance
 
@@ -150,7 +149,7 @@ class BonRetourListSerializer(serializers.ModelSerializer):
 
     client_name = serializers.CharField(source="client.nom_client", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    total_materials = serializers.SerializerMethodField()
+    total_products = serializers.SerializerMethodField()
 
     class Meta:
         model = BonRetour
@@ -162,24 +161,24 @@ class BonRetourListSerializer(serializers.ModelSerializer):
             "status_display",
             "date_reception",
             "date_retour",
-            "total_materials",
+            "total_products",
         ]
 
-    def get_total_materials(self, obj):
-        """Get total number of different materials in this return"""
-        return obj.matiere_retours.count()
+    def get_total_products(self, obj):
+        """Get total number of different products in this return"""
+        return obj.produit_retours.count()
 
 
 class ClientMaterialsSerializer(serializers.ModelSerializer):
-    """Serializer to show client's available materials for return"""
+    """Serializer to show client's available products for return"""
 
-    available_materials = serializers.SerializerMethodField()
+    available_products = serializers.SerializerMethodField()
 
     class Meta:
         model = Client
-        fields = ["id", "nom_client", "numero_fiscal", "available_materials"]
+        fields = ["id", "nom_client", "numero_fiscal", "available_products"]
 
-    def get_available_materials(self, obj):
-        """Get all materials for this client that have remaining quantity > 0"""
-        materials = obj.matieres.filter(remaining_quantity__gt=0)
-        return MatiereForRetourSerializer(materials, many=True).data
+    def get_available_products(self, obj):
+        """Get all products for this client that have remaining quantity > 0"""
+        products = obj.produits.filter(remaining_quantity__gt=0)
+        return ProduitForRetourSerializer(products, many=True).data
