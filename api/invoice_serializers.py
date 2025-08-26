@@ -1,19 +1,19 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage, FactureTravaux
+from .models import Client, Traveaux, Produit, FactureProduits
 from .serializers import ClientSerializer
 from django.db import transaction
 from django.utils import timezone
 
+# A supprimer
+# class MatiereUsageInvoiceSerializer(serializers.Serializer):
+#     """Serializer for material usage within an invoice"""
 
-class MatiereUsageInvoiceSerializer(serializers.Serializer):
-    """Serializer for material usage within an invoice"""
-
-    matiere_id = serializers.IntegerField()
-    nom_matiere = serializers.CharField(read_only=True)
-    type_matiere = serializers.CharField(read_only=True)
-    quantite_utilisee = serializers.FloatField()
-    prix_unitaire = serializers.FloatField(read_only=True)
-    total = serializers.FloatField(read_only=True)
+#     matiere_id = serializers.IntegerField()
+#     nom_matiere = serializers.CharField(read_only=True)
+#     type_matiere = serializers.CharField(read_only=True)
+#     quantite_utilisee = serializers.FloatField()
+#     prix_unitaire = serializers.FloatField(read_only=True)
+#     total = serializers.FloatField(read_only=True)
 
 
 class InvoiceItemSerializer(serializers.Serializer):
@@ -32,7 +32,8 @@ class InvoiceItemSerializer(serializers.Serializer):
     remise_percent_produit = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True)
 
     billable = serializers.SerializerMethodField()
-    matiere_usages = MatiereUsageInvoiceSerializer(many=True, required=False)
+    # A supprimer
+    # matiere_usages = MatiereUsageInvoiceSerializer(many=True, required=False)
 
     def get_billable(self, obj):
         quantite = obj.quantite
@@ -52,7 +53,7 @@ class InvoiceItemSerializer(serializers.Serializer):
             "total_ht": round(total_after_remise, 2),
         }
 
-class FactureTravauxSerializer(serializers.ModelSerializer):
+class FactureProduitsSerializer(serializers.ModelSerializer):
     """Serializer for the invoice model"""
 
     client_details = serializers.SerializerMethodField()
@@ -75,7 +76,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     )
 
     class Meta:
-        model = FactureTravaux
+        model = FactureProduits
         fields = (
             "id",
             "nature", # Facture ou avoir-facture ou avoir
@@ -112,7 +113,9 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
     
     def get_items(self, obj):
         """Get work items included in the invoice using InvoiceItemSerializer"""
-        travaux_qs = obj.travaux.all().select_related("produit").prefetch_related("matiere_usages__matiere")
+        # A supprimer
+        # travaux_qs = obj.travaux.all().select_related("produit").prefetch_related("matiere_usages__matiere")
+        travaux_qs = obj.travaux.all().select_related("produit")
         return InvoiceItemSerializer(travaux_qs, many=True).data
 
 
@@ -200,7 +203,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         numero_facture = validated_data.get("numero_facture")
         if not numero_facture:
             today = timezone.now().strftime("%Y%m%d")
-            count = FactureTravaux.objects.filter(
+            count = FactureProduits.objects.filter(
                 numero_facture__startswith=f"INV-{today}"
             ).count()
             numero_facture = f"INV-{today}-{count + 1:03d}"
@@ -221,7 +224,7 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         invoice_create_data = {
             k: v for k, v in invoice_create_data.items() if v is not None
         }
-        invoice = FactureTravaux(**invoice_create_data)
+        invoice = FactureProduits(**invoice_create_data)
         invoice.save()
     
         invoice.travaux.set(travaux_list)
@@ -240,10 +243,10 @@ class FactureTravauxSerializer(serializers.ModelSerializer):
         return invoice
 
 
-class FactureTravauxDetailSerializer(FactureTravauxSerializer):
+class FactureProduitsDetailSerializer(FactureProduitsSerializer):
     """Detailed serializer with additional fields for invoice retrieval"""
 
     client_name = serializers.CharField(source="client.nom_client", read_only=True)
     code_client= serializers.CharField(source="client.code_client", read_only=True)
-    class Meta(FactureTravauxSerializer.Meta):
-        fields = FactureTravauxSerializer.Meta.fields + ("client_name","code_client")
+    class Meta(FactureProduitsSerializer.Meta):
+        fields = FactureProduitsSerializer.Meta.fields + ("client_name","code_client")
