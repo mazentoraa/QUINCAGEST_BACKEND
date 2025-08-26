@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Commande, ProduitCommande, Produit, FactureTravaux
+from .models import Commande, ProduitCommande, Produit
 
 
 class ProduitCommandeSerializer(serializers.ModelSerializer):
@@ -94,7 +94,6 @@ class CommandeDetailSerializer(serializers.ModelSerializer):
                 "id": p.id,
                 "nom_produit": p.nom_produit,
                 "prix": p.prix,
-                "type_matiere": p.type_matiere,
                 "code_produit":p.code_produit ,
             }
             for p in produits
