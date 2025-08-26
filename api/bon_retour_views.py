@@ -5,11 +5,11 @@ from rest_framework.viewsets import ModelViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django.shortcuts import get_object_or_404
 
-from .models import BonRetour, Client, Matiere
+from .models import BonRetour, Client, Produit
 from .bon_retour_serializers import (
     BonRetourSerializer,
     BonRetourListSerializer,
-    MatiereForRetourSerializer,
+    ProduitForRetourSerializer,
 )
 
 
@@ -17,7 +17,7 @@ class BonRetourViewSet(ModelViewSet):
     """ViewSet for BonRetour with full CRUD operations"""
 
     queryset = BonRetour.objects.select_related("client").prefetch_related(
-        "matiere_retours__matiere"
+        "produit_retours__produit"
     )
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ["numero_bon", "client__nom_client", "notes"]
@@ -59,75 +59,75 @@ class BonRetourViewSet(ModelViewSet):
         """Handle update with custom logic"""
         serializer.save()
 
+# A supprimer
+# @api_view(["GET"])
+# def client_available_materials(request, client_id):
+#     """Get all materials available for return for a specific client"""
+#     try:
+#         client = get_object_or_404(Client, id=client_id)
 
-@api_view(["GET"])
-def client_available_materials(request, client_id):
-    """Get all materials available for return for a specific client"""
-    try:
-        client = get_object_or_404(Client, id=client_id)
+#         # Get materials with remaining quantity > 0
+#         materials = client.matieres.filter(remaining_quantity__gt=0)
 
-        # Get materials with remaining quantity > 0
-        materials = client.matieres.filter(remaining_quantity__gt=0)
+#         response_data = {
+#             "client": {
+#                 "id": client.id,
+#                 "nom_client": client.nom_client,
+#                 "numero_fiscal": client.numero_fiscal,
+#             },
+#             "available_materials": MatiereForRetourSerializer(
+#                 materials, many=True
+#             ).data,
+#         }
 
-        response_data = {
-            "client": {
-                "id": client.id,
-                "nom_client": client.nom_client,
-                "numero_fiscal": client.numero_fiscal,
-            },
-            "available_materials": MatiereForRetourSerializer(
-                materials, many=True
-            ).data,
-        }
+#         return Response(response_data, status=status.HTTP_200_OK)
 
-        return Response(response_data, status=status.HTTP_200_OK)
-
-    except Client.DoesNotExist:
-        return Response({"error": "Client not found"}, status=status.HTTP_404_NOT_FOUND)
+#     except Client.DoesNotExist:
+#         return Response({"error": "Client not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(["POST"])
 def validate_return_quantities(request):
     """Validate return quantities before creating BonRetour"""
-    materials_data = request.data.get("materials", [])
+    products_data = request.data.get("products", [])
 
-    if not materials_data:
+    if not products_data:
         return Response(
-            {"error": "No materials provided for validation"},
+            {"error": "No products provided for validation"},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     validation_results = []
     has_errors = False
 
-    for material_data in materials_data:
-        matiere_id = material_data.get("matiere_id")
-        quantite_retournee = material_data.get("quantite_retournee", 0)
+    for product_data in products_data:
+        produit_id = product_data.get("produit_id")
+        quantite_retournee = product_data.get("quantite_retournee", 0)
 
         try:
-            matiere = Matiere.objects.get(id=matiere_id)
+            produit = Produit.objects.get(id=produit_id)
 
             result = {
-                "matiere_id": matiere_id,
-                "matiere_name": f"{matiere.type_matiere} - {matiere.client.nom_client}",
+                "produit_id": produit_id,
+                "produit_name": f"{produit.type_produit} - {produit.client.nom_client}",
                 "requested_quantity": quantite_retournee,
-                "available_quantity": matiere.remaining_quantity,
-                "is_valid": quantite_retournee <= matiere.remaining_quantity,
+                "available_quantity": produit.remaining_quantity,
+                "is_valid": quantite_retournee <= produit.remaining_quantity,
             }
 
             if not result["is_valid"]:
                 result["error"] = (
-                    f"Cannot return {quantite_retournee} units. Only {matiere.remaining_quantity} available."
+                    f"Cannot return {quantite_retournee} units. Only {produit.remaining_quantity} available."
                 )
                 has_errors = True
 
             validation_results.append(result)
 
-        except Matiere.DoesNotExist:
+        except Produit.DoesNotExist:
             validation_results.append(
                 {
-                    "matiere_id": matiere_id,
-                    "error": "Material not found",
+                    "produit_id": produit_id,
+                    "error": "Product not found",
                     "is_valid": False,
                 }
             )
