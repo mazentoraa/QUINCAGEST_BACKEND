@@ -475,7 +475,7 @@ class FactureProduits(models.Model):
         Client, on_delete=models.CASCADE, related_name="factures", help_text="Client"
     )
     produits = models.ManyToManyField(
-        "Produits", related_name="factures", help_text="Work items included in invoice"
+        "Produit", related_name="factures", help_text="Work items included in invoice"
     )
 
     date_emission = models.DateField(help_text="Invoice generation date")
@@ -1455,7 +1455,7 @@ class PlanTraite(models.Model):
 
 
     facture = models.OneToOneField(
-        'FactureTravaux', on_delete=models.CASCADE, null=True, blank=True
+        'FactureProduits', on_delete=models.CASCADE, null=True, blank=True
     )
     client = models.ForeignKey(
         "Client", on_delete=models.SET_NULL, null=True, blank=True
@@ -2047,7 +2047,7 @@ class Consommable(models.Model):
         return self.nom
 
 from django.db import models
-from .models import Fournisseur, Matiere
+from .models import Fournisseur
 
 class BonRetourFournisseur(models.Model):
     numero_bon = models.CharField(max_length=50, unique=True)

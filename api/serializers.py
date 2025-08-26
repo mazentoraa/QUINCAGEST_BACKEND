@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, Produit, ProduitUsage, Entreprise
+from .models import Client, Produit, Produit, Entreprise
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
-from .models import ProduitPremiereAchat
 from decimal import Decimal
 
 # A supprimer
@@ -475,7 +474,7 @@ class FournisseurBasicSerializer(serializers.ModelSerializer):
 
 class BonRetourFournisseurSerializer(serializers.ModelSerializer):
     fournisseur_details = FournisseurBasicSerializer(source="fournisseur", read_only=True)
-    produit_retours = ProduitFournisseurFreeSerializer(many=True)
+    produit_retours = ProduitRetourFournisseurFreeSerializer(many=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:

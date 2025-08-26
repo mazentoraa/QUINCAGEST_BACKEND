@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Cd, PdC, Client, FactureTravaux
+from .models import Cd, PdC, Client, FactureProduits
 from .pdc_serializers import (
     CdListSerializer,
     CDetailSerializer,
@@ -55,9 +55,9 @@ class CdViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             commande = serializer.save()
 
-            # Link bons (FactureTravaux) to the commande
+            # Link bons (FactureProduits) to the commande
             if bon_ids:
-                bons = FactureTravaux.objects.filter(id__in=bon_ids)
+                bons = FactureProduits.objects.filter(id__in=bon_ids)
                 commande.bons.set(bons)
                 print("Bons liés à la commande:", list(bons.values_list("id", flat=True)))
             else:

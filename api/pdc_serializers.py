@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Cd, PdC, Produit, FactureTravaux
+from .models import Cd, PdC, Produit, FactureProduits
 
 
 class PdCSerializer(serializers.ModelSerializer):
@@ -45,7 +45,7 @@ class CDetailSerializer(serializers.ModelSerializer):
     facture_numero = serializers.ReadOnlyField(source="facture.numero_facture")
     code_client = serializers.ReadOnlyField(source="client.code_client")
     bons = serializers.PrimaryKeyRelatedField(
-        many=True, queryset=FactureTravaux.objects.all(), required=False
+        many=True, queryset=FactureProduits.objects.all(), required=False
     )
 
     class Meta:
@@ -100,7 +100,7 @@ class CdPSerializer(serializers.Serializer):
     quantite = serializers.IntegerField(min_value=1)
     prix_unitaire = serializers.FloatField(required=False, allow_null=True)
     remise_pourcentage = serializers.FloatField(default=0, min_value=0, max_value=100)
-    bon_id = serializers.PrimaryKeyRelatedField(queryset=FactureTravaux.objects.all(), required=False, allow_null=True)
+    bon_id = serializers.PrimaryKeyRelatedField(queryset=FactureProduits.objects.all(), required=False, allow_null=True)
     bon_numero = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 class CdGenerateInvoiceSerializer(serializers.Serializer):

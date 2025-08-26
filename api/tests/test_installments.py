@@ -1,7 +1,7 @@
 import pytest
 from rest_framework.test import APIClient
 from django.urls import reverse
-from api.models import Client, FactureTravaux, PlanTraite, Traite, Bank
+from api.models import Client, FactureProduits, PlanTraite, Traite, Bank
 from django.utils import timezone
 from datetime import timedelta
 
@@ -20,7 +20,7 @@ def client():
 
 @pytest.fixture
 def facture(client):
-    facture = FactureTravaux.objects.create(
+    facture = FactureProduits.objects.create(
         numero_facture="FAC-001",
         client=client,
         date_emission=timezone.now().date(),

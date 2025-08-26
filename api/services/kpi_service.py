@@ -1,7 +1,7 @@
 from django.db.models import Sum, F
 from datetime import date, timedelta, datetime
 from django.utils.timezone import now
-from api.models import Avoir, Cd, Devis, Traite, TraiteFournisseur, Avance, FichePaie, Achat, FactureAchatMatiere, PlanTraiteFournisseur
+from api.models import Avoir, Cd, Devis, Traite, TraiteFournisseur, Avance, FichePaie, Achat, FactureAchatProduit, PlanTraiteFournisseur
 from api.utils.dates import get_week_range
 from api.services.schedule_service import get_schedule
 from .traite_service import get_all_traites

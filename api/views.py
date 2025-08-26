@@ -4,13 +4,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from datetime import date, timedelta
 from django.db.models import Q
-from .models import Client, Traveaux, Produit, Matiere, MatiereUsage,Entreprise
+from .models import Client, Produit, Entreprise
 from .serializers import (
     ClientSerializer,
-    TraveauxSerializer,
     ProduitSerializer,
-    MatiereSerializer,
-    MatiereUsageSerializer,
     EntrepriseSerializer,
     
 )
@@ -22,8 +19,6 @@ from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from rest_framework import viewsets, filters
-from .models import MatierePremiereAchat
-from .serializers import MatierePremiereAchatSerializer
 
 # A supprimer
 # class MatiereViewSet(viewsets.ModelViewSet):
@@ -648,55 +643,54 @@ class EntrepriseViewSet(viewsets.ModelViewSet):
 
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
-from .models import MatierePremiereAchat
-from .serializers import MatierePremiereAchatSerializer
+# from .serializers import MatierePremiereAchatSerializer
 
 # A supprimer
-class ProduitAchatViewSet(viewsets.ModelViewSet):
-    queryset = MatierePremiereAchat.objects.all().order_by("-created_at")
-    serializer_class = MatierePremiereAchatSerializer
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['ref', 'nom_produit', 'fournisseur_principal']
+# class ProduitAchatViewSet(viewsets.ModelViewSet):
+#     queryset = MatierePremiereAchat.objects.all().order_by("-created_at")
+#     serializer_class = MatierePremiereAchatSerializer
+#     filter_backends = [filters.SearchFilter]
+#     search_fields = ['ref', 'nom_produit', 'fournisseur_principal']
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        categorie = self.request.query_params.get("categorie")
-        if categorie and categorie != "all":
-            queryset = queryset.filter(categorie=categorie)
-        return queryset
+#     def get_queryset(self):
+#         queryset = super().get_queryset()
+#         categorie = self.request.query_params.get("categorie")
+#         if categorie and categorie != "all":
+#             queryset = queryset.filter(categorie=categorie)
+#         return queryset
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        if not serializer.is_valid():
-            print("❌ Erreurs de validation (create):", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         if not serializer.is_valid():
+#             print("❌ Erreurs de validation (create):", serializer.errors)
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#         self.perform_create(serializer)
+#         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        if not serializer.is_valid():
-            print("❌ Erreurs de validation (update):", serializer.errors)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        self.perform_update(serializer)
-        return Response(serializer.data)
+#     def update(self, request, *args, **kwargs):
+#         partial = kwargs.pop('partial', False)
+#         instance = self.get_object()
+#         serializer = self.get_serializer(instance, data=request.data, partial=partial)
+#         if not serializer.is_valid():
+#             print("❌ Erreurs de validation (update):", serializer.errors)
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#         self.perform_update(serializer)
+#         return Response(serializer.data)
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response({"message": "Produit supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)
+#     def destroy(self, request, *args, **kwargs):
+#         instance = self.get_object()
+#         self.perform_destroy(instance)
+#         return Response({"message": "Produit supprimée avec succès."}, status=status.HTTP_204_NO_CONTENT)
 
 
 
 
 from rest_framework import viewsets
-from .models import FactureAchatMatiere
+from .models import FactureAchatProduit
 from .serializers import FactureAchatProduitSerializer
 
 class FactureAchatProduitViewSet(viewsets.ModelViewSet):
-    queryset = FactureAchatMatiere.objects.all().order_by('-id')
+    queryset = FactureAchatProduit.objects.all().order_by('-id')
     serializer_class = FactureAchatProduitSerializer
 
 

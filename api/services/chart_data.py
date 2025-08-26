@@ -1,6 +1,6 @@
 from datetime import timedelta
 from django.db.models import Sum
-from api.models import Cd, FactureAchatMatiere, TraiteFournisseur, Traite
+from api.models import Cd, FactureAchatProduit, TraiteFournisseur, Traite
 from .kpi_service import compute_kpis
 
 def compute_chart_data(start_date, end_date, labels, period_type):

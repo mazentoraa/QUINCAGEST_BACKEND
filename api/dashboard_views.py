@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.db.models import Sum, Count
 
-from .models import Client, Matiere, Produit, Traveaux, FactureTravaux, Devis, Commande, Fournisseur, Employe
+from .models import Client, Produit, FactureProduits, Devis, Commande, Fournisseur, Employe
 from .commande_serializers import CommandeListSerializer
 
 
@@ -14,12 +14,10 @@ def global_counts(request):
     """
     counts = {
         "total_clients": Client.objects.count(),
-        "total_matieres": Matiere.objects.count(),
         "total_produits": Produit.objects.count(),
-        "total_traveaux": Traveaux.objects.count(),
         "total_devis": Devis.objects.count(),
         "total_commandes": Commande.objects.count(),
-        "total_factures_travaux": FactureTravaux.objects.count(),
+        "total_factures_travaux": FactureProduits.objects.count(),
         "total_fournisseurs": Fournisseur.objects.count(),
         "total_employees": Employe.objects.count(),
     }
@@ -32,10 +30,10 @@ def financial_summary(request):
     Provides a summary of financial data.
     """
     total_invoiced = (
-        FactureTravaux.objects.aggregate(total=Sum("montant_ttc"))["total"] or 0
+        FactureProduits.objects.aggregate(total=Sum("montant_ttc"))["total"] or 0
     )
     total_paid = (
-        FactureTravaux.objects.filter(statut="paid").aggregate(
+        FactureProduits.objects.filter(statut="paid").aggregate(
             total=Sum("montant_ttc")
         )["total"]
         or 0
@@ -90,12 +88,12 @@ def recent_factures(request):
     """
     Provides a list of the 5 most recent factures.
     """
-    recent_factures = FactureTravaux.objects.order_by("-date_creation")[:5]
+    recent_factures = FactureProduits.objects.order_by("-date_creation")[:5]
     from .invoice_serializers import (
-        FactureTravauxSerializer,
-    )  # Assuming you have a FactureTravauxSerializer
+        FactureProduitsSerializer,
+    )  # Assuming you have a FactureProduitsSerializer
 
-    serializer = FactureTravauxSerializer(recent_factures, many=True)
+    serializer = FactureProduitsSerializer(recent_factures, many=True)
     return Response(serializer.data)
 
 
@@ -108,21 +106,19 @@ def main_dashboard_insights(request):
     insights = {
         "counts": {
             "clients": Client.objects.count(),
-            "matieres": Matiere.objects.count(),
             "produits": Produit.objects.count(),
-            "traveaux": Traveaux.objects.count(),
             "devis": Devis.objects.count(),
             "commandes": Commande.objects.count(),
-            "factures_travaux": FactureTravaux.objects.count(),
+            "factures_produits": FactureProduits.objects.count(),
             "fournisseurs": Fournisseur.objects.count(),
             "employees": Employe.objects.count(),
         },
         "financials": {
-            "total_invoiced_ttc": FactureTravaux.objects.aggregate(
+            "total_invoiced_ttc": FactureProduits.objects.aggregate(
                 total=Sum("montant_ttc")
             )["total"]
             or 0,
-            "total_paid_ttc": FactureTravaux.objects.filter(statut="paid").aggregate(
+            "total_paid_ttc": FactureProduits.objects.filter(statut="paid").aggregate(
                 total=Sum("montant_ttc")
             )["total"]
             or 0,

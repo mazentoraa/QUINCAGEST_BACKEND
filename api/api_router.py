@@ -5,8 +5,6 @@ from .views import (
     AdminLoginView,
     LogoutView,
     CheckAuthView,
-    TraveauxViewSet,
-    MatiereViewSet,
     ProduitViewSet,
     EntrepriseViewSet,
     
@@ -16,12 +14,10 @@ from .views import (
     TraiteView,
     PeriodView
 )
-from .invoice_views import FactureTravauxViewSet
 from .installments_views import PlanTraiteViewSet, TraiteViewSet
-from .facture_matiere_views import FactureMatiereViewSet
+# from .facture_matiere_views import FactureMatiereViewSet
 from .bon_retour_views import (
     BonRetourViewSet,
-    client_available_materials,
     validate_return_quantities,
     BonRetourByClientView,
     BonRetourStatsView,
@@ -33,9 +29,9 @@ from .cd_views import CdViewSet
 from .facture_views import CommandeProduitViewSet,LineCommandeViewSet,FactureViewSet,PaymentComptantViewSet
 
 from . import dashboard_views
-from .views import MatierePremiereAchatViewSet
-from .views import FactureAchatMatiereViewSet
-from .views import BonLivraisonMatiereViewSet
+# from .views import MatierePremiereAchatViewSet
+# from .views import FactureAchatMatiereViewSet
+# from .views import BonLivraisonMatiereViewSet
 from .views import FournisseurViewSet
 from .views import ConsommableViewSet
 from .views import (
@@ -52,14 +48,11 @@ from .views import AvanceViewSet,FichePaieViewSet
 from .views import AvoirViewSet
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
-router.register(r"traveaux", TraveauxViewSet)
-router.register(r"matieres", MatiereViewSet)
 router.register(r"produits", ProduitViewSet)
-router.register(r"factures", FactureTravauxViewSet)
 router.register(r"plans-traite", PlanTraiteViewSet)
 router.register(r"traites", TraiteViewSet)
 router.register(r"entreprises", EntrepriseViewSet)
-router.register(r"factures-matieres", FactureMatiereViewSet)
+# router.register(r"factures-matieres", FactureMatiereViewSet)
 router.register(r"bons-retour", BonRetourViewSet)
 router.register(r"devis", DevisViewSet)
 router.register(r"commandes", CommandeViewSet, basename="commandes")
@@ -68,10 +61,10 @@ router.register(r"lignes-commandes", LineCommandeViewSet)
 router.register(r"factures_produits", FactureViewSet)
 router.register(r"payments-comptants", PaymentComptantViewSet)
 router.register(r"cds", CdViewSet)
-router.register(r"matiere-purchase", MatierePurchaseViewSet)
-router.register(r'matiere-achat', MatierePremiereAchatViewSet, basename='matiere-achat')
-router.register(r"factures-achat-matieres", FactureAchatMatiereViewSet, basename="facture-achat-matiere")
-router.register(r'bon-livraison-matieres', BonLivraisonMatiereViewSet, basename='bonlivraisonmatiere')
+# router.register(r"matiere-purchase", MatierePurchaseViewSet)
+# router.register(r'matiere-achat', MatierePremiereAchatViewSet, basename='matiere-achat')
+# router.register(r"factures-achat-matieres", FactureAchatMatiereViewSet, basename="facture-achat-matiere")
+# router.register(r'bon-livraison-matieres', BonLivraisonMatiereViewSet, basename='bonlivraisonmatiere')
 router.register(r'fournisseurs', FournisseurViewSet, basename='fournisseur')
 router.register(r'consommables', ConsommableViewSet)
 router.register(r"bons-retour-fournisseurs", BonRetourFournisseurViewSet, basename="bon-retour-fournisseur")
@@ -88,11 +81,6 @@ urlpatterns = [
     path("api/auth/logout/", LogoutView.as_view(), name="logout"),
     path("api/auth/check/", CheckAuthView.as_view(), name="check-auth"),
     # BonRetour specific endpoints
-    path(
-        "api/clients/<int:client_id>/available-materials/",
-        client_available_materials,
-        name="client-available-materials",
-    ),
     path(
         "api/bons-retour/validate-quantities/",
         validate_return_quantities,
