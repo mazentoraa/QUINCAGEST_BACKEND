@@ -7,28 +7,28 @@ from django.db import transaction
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .models import FactureTravaux, Traveaux, Client
+from .models import FactureProduits, Traveaux, Client
 from .invoice_serializers import (
-    FactureTravauxSerializer,
-    FactureTravauxDetailSerializer,
+    FactureProduitsSerializer,
+    FactureProduitsDetailSerializer,
 )
 
 
-class FactureTravauxViewSet(viewsets.ModelViewSet):
+class FactureProduitsViewSet(viewsets.ModelViewSet):
     """
-    API pour la gestion des factures de travaux.
+    API pour la gestion des factures de produits.
 
     Liste toutes les factures, crée de nouvelles factures, et modifie ou supprime les factures existantes.
     """
 
     permission_classes = [IsAdminUser]
-    queryset = FactureTravaux.objects.all().order_by("-date_emission")
-    serializer_class = FactureTravauxSerializer
+    queryset = FactureProduits.objects.all().order_by("-date_emission")
+    serializer_class = FactureProduitsSerializer
 
     def get_serializer_class(self):
         if self.action == "retrieve":
-            return FactureTravauxDetailSerializer
-        return FactureTravauxSerializer
+            return FactureProduitsDetailSerializer
+        return FactureProduitsSerializer
 
     def get_queryset(self):
         """
@@ -60,10 +60,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
         else:
             queryset = queryset.filter(is_deleted=False)
         return queryset.prefetch_related(
-            "travaux",
-            "travaux__produit",
-            "travaux__matiere_usages",
-            "travaux__matiere_usages__matiere",
+            "produits",
         )
 
     @swagger_auto_schema(
@@ -113,47 +110,49 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                                 type=openapi.TYPE_NUMBER,
                                 description="Discount rate per product",
                             ),
-                            "matiere_usages": openapi.Schema(
-                                type=openapi.TYPE_ARRAY,
-                                items=openapi.Schema(
-                                    type=openapi.TYPE_OBJECT,
-                                    properties={
-                                        "matiere_id": openapi.Schema(
-                                            type=openapi.TYPE_INTEGER,
-                                            description="ID of the material (for reference)",
-                                        ),
-                                        "nom_matiere": openapi.Schema(
-                                            type=openapi.TYPE_STRING,
-                                            description="Name of the material (for reference)",
-                                        ),
-                                        "type_matiere": openapi.Schema(
-                                            type=openapi.TYPE_STRING,
-                                            description="Type of the material (for reference)",
-                                        ),
-                                        "thickness": openapi.Schema(
-                                            type=openapi.TYPE_INTEGER,
-                                            description="Thickness (for reference)",
-                                        ),
-                                        "length": openapi.Schema(
-                                            type=openapi.TYPE_INTEGER,
-                                            description="Length (for reference)",
-                                        ),
-                                        "width": openapi.Schema(
-                                            type=openapi.TYPE_INTEGER,
-                                            description="Width (for reference)",
-                                        ),
-                                        "quantite_utilisee": openapi.Schema(
-                                            type=openapi.TYPE_INTEGER,
-                                            description="Quantity of material used (for reference)",
-                                        ),
-                                        "prix_unitaire": openapi.Schema(
-                                            type=openapi.TYPE_NUMBER,
-                                            description="Unit price of material (for reference)",
-                                        ),
-                                    },
-                                ),
-                                description="List of materials used for this work item (for reference)",
-                            ),
+                            # A supprimer
+                            
+                            # "matiere_usages": openapi.Schema(
+                            #     type=openapi.TYPE_ARRAY,
+                            #     items=openapi.Schema(
+                            #         type=openapi.TYPE_OBJECT,
+                            #         properties={
+                            #             "matiere_id": openapi.Schema(
+                            #                 type=openapi.TYPE_INTEGER,
+                            #                 description="ID of the material (for reference)",
+                            #             ),
+                            #             "nom_matiere": openapi.Schema(
+                            #                 type=openapi.TYPE_STRING,
+                            #                 description="Name of the material (for reference)",
+                            #             ),
+                            #             "type_matiere": openapi.Schema(
+                            #                 type=openapi.TYPE_STRING,
+                            #                 description="Type of the material (for reference)",
+                            #             ),
+                            #             "thickness": openapi.Schema(
+                            #                 type=openapi.TYPE_INTEGER,
+                            #                 description="Thickness (for reference)",
+                            #             ),
+                            #             "length": openapi.Schema(
+                            #                 type=openapi.TYPE_INTEGER,
+                            #                 description="Length (for reference)",
+                            #             ),
+                            #             "width": openapi.Schema(
+                            #                 type=openapi.TYPE_INTEGER,
+                            #                 description="Width (for reference)",
+                            #             ),
+                            #             "quantite_utilisee": openapi.Schema(
+                            #                 type=openapi.TYPE_INTEGER,
+                            #                 description="Quantity of material used (for reference)",
+                            #             ),
+                            #             "prix_unitaire": openapi.Schema(
+                            #                 type=openapi.TYPE_NUMBER,
+                            #                 description="Unit price of material (for reference)",
+                            #             ),
+                            #         },
+                            #     ),
+                            #     description="List of materials used for this work item (for reference)",
+                            # ),
                         },
                     ),
                     description="List of line items (work items) for the invoice.",
@@ -188,7 +187,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             },
         ),
         responses={
-            201: FactureTravauxSerializer,
+            201: FactureProduitsSerializer,
             400: "Données invalides ou incomplètes",
         },
     )
@@ -222,7 +221,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             )
         ],
         responses={
-            200: FactureTravauxSerializer(many=True),
+            200: FactureProduitsSerializer(many=True),
             400: "Paramètre de recherche manquant",
         },
     )
@@ -257,7 +256,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             )
         ],
         responses={
-            200: FactureTravauxSerializer(many=True),
+            200: FactureProduitsSerializer(many=True),
             400: "Paramètre client_id manquant",
         },
     )
@@ -290,7 +289,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             },
         ),
         responses={
-            200: FactureTravauxSerializer,
+            200: FactureProduitsSerializer,
             400: "Statut invalide",
             404: "Facture non trouvée",
         },
@@ -304,7 +303,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             invoice = self.get_object()
             new_status = request.data.get("statut")
 
-            if not new_status or new_status not in dict(FactureTravaux.STATUT_CHOICES):
+            if not new_status or new_status not in dict(FactureProduits.STATUT_CHOICES):
                 return Response(
                     {"error": "Valid status is required"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -316,7 +315,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(invoice)
             return Response(serializer.data)
 
-        except FactureTravaux.DoesNotExist:
+        except FactureProduits.DoesNotExist:
             return Response(
                 {"error": "Invoice not found"}, status=status.HTTP_404_NOT_FOUND
             )
@@ -354,7 +353,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
         # Status counts
         status_counts = {
             status: self.queryset.filter(statut=status).count()
-            for status, _ in FactureTravaux.STATUT_CHOICES
+            for status, _ in FactureProduits.STATUT_CHOICES
         }
 
         # Calculate total, paid, and pending amounts
@@ -369,9 +368,9 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
         invoices = self.queryset.all()
         for invoice in invoices:
             invoice_total = 0
-            for travaux in invoice.travaux.all():
-                if travaux.produit.prix:
-                    invoice_total += travaux.quantite * travaux.produit.prix
+            for produit in invoice.produits.all():
+                if produit.prix:
+                    invoice_total += produit.quantite * produit.produit.prix
 
             if invoice.statut == "paid":
                 paid_amount += invoice_total
@@ -401,13 +400,13 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
         try:
             # First, let's check if the object exists at all (including deleted ones)
             try:
-                commande = FactureTravaux.objects.get(pk=pk)
+                commande = FactureProduits.objects.get(pk=pk)
                 print(f"✅ Found Bons Découpe object: ID={commande.id}, is_deleted={commande.is_deleted}")
-            except FactureTravaux.DoesNotExist:
+            except FactureProduits.DoesNotExist:
                 print(f"❌ No Bons Découpe object found with ID: {pk}")
                 # Let's see what IDs actually exist
-                existing_ids = list(FactureTravaux.objects.all().values_list('id', flat=True))
-                deleted_ids = list(FactureTravaux.objects.filter(is_deleted=True).values_list('id', flat=True))
+                existing_ids = list(FactureProduits.objects.all().values_list('id', flat=True))
+                deleted_ids = list(FactureProduits.objects.filter(is_deleted=True).values_list('id', flat=True))
                 print(f"📊 All existing Bons Découpe IDs: {existing_ids}")
                 print(f"🗑️ Deleted Bons Découpe IDs: {deleted_ids}")
                 
@@ -422,19 +421,19 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                 )
             
             # Check if it's actually deleted
-            if not FactureTravaux.is_deleted:
+            if not FactureProduits.is_deleted:
                 print(f"⚠️ Warning: Bon Découpe {pk} is not marked as deleted (is_deleted={commande.is_deleted})")
                 return Response(
                     {
                         "error": f"Bon Découpe {pk} is not deleted and cannot be restored",
                         "current_status": "active",
-                        "is_deleted": FactureTravaux.is_deleted
+                        "is_deleted": FactureProduits.is_deleted
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             
             # Restore the record
-            instance = FactureTravaux.objects.get(pk=pk)
+            instance = FactureProduits.objects.get(pk=pk)
             instance.is_deleted = False
             instance.save()
             
@@ -495,7 +494,7 @@ class FactureTravauxViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK
             )
             
-        except FactureTravaux.DoesNotExist:
+        except FactureProduits.DoesNotExist:
             return Response(
                 {"error": f"Bon with ID {pk} not found"}, 
                 status=status.HTTP_404_NOT_FOUND
