@@ -196,83 +196,104 @@ class Client(models.Model):
 
 class Produit(models.Model):
     nom_produit = models.CharField(max_length=255, help_text="Product name")
+
+    ref_produit = models.CharField(
+        max_length=100, unique=True, help_text="Reference code for the product"
+    )
+
+    categorie = models.CharField(
+        max_length=100, help_text="Main product category", blank=True, null=True
+    )
+
+    sous_categorie = models.CharField(
+        max_length=100, help_text="Sub-category of the product", blank=True, null=True
+    )
+
+    materiau = models.CharField(
+        max_length=100, help_text="Material of the product", blank=True, null=True
+    )
+
+    fournisseur = models.CharField(
+        max_length=255, help_text="Supplier of the product", blank=True, null=True
+    )
+
+    stock_initial = models.PositiveIntegerField(
+        default=0, help_text="Initial stock quantity"
+    )
+
+    seuil_alerte = models.PositiveIntegerField(
+        default=0, help_text="Stock alert threshold"
+    )
+
+    unite_mesure = models.CharField(
+        max_length=50, help_text="Unit of measurement (e.g., kg, m, piece)", blank=True, null=True
+    )
+
+    statut = models.CharField(
+        max_length=50,
+        choices=[
+            ("actif", "Actif"),
+            ("inactif", "Inactif"),
+            ("supprime", "Supprimé"),
+        ],
+        default="actif",
+        help_text="Product status",
+    )
+
+    code_barres = models.CharField(
+        max_length=100, blank=True, null=True, help_text="Product barcode"
+    )
+
+    emplacement = models.CharField(
+        max_length=255, blank=True, null=True, help_text="Storage location"
+    )
+
+    prix_achat = models.FloatField(
+        null=True, blank=True, help_text="Purchase price of the product"
+    )
+
+    prix_vente = models.FloatField(
+        null=True, blank=True, help_text="Selling price of the product"
+    )
+
     description = models.TextField(
         blank=True, null=True, help_text="Product description"
     )
-    type_matiere = models.CharField(
-        max_length=50,
-        choices=[
-            ("acier", "Acier"),
-            ("acier_inoxydable", "Acier inoxydable"),
-            ("aluminium", "Aluminium"),
-            ("laiton", "Laiton"),
-            ("cuivre", "Cuivre"),
-            ("acier_galvanise", "Acier galvanisé"),
-            ("autre", "Autre"),
-        ],
-        default="autre",
-        help_text="Material type",
-    )
-    prix = models.FloatField(
-        help_text="Product price",
-        null=True,
-        blank=True,
-    )
+
     image = models.ImageField(
-        upload_to="produits/",
-        blank=True,
-        null=True,
-        help_text="Product image",
+        upload_to="produits/", blank=True, null=True, help_text="Product image"
     )
-    epaisseur = models.FloatField(
-        help_text="Thickness of the product in mm",
-        null=True,
-        blank=True,
-    )
-    longueur = models.FloatField(
-        help_text="Length of the product in mm",
-        null=True,
-        blank=True,
-    )
-    largeur = models.FloatField(  # Added field
-        help_text="Width of the product in mm",
-        null=True,
-        blank=True,
-    )
-    surface = models.FloatField(
-        help_text="Surface area of the product in m²",
-        null=True,
-        blank=True,
-    )
+
     date_creation = models.DateTimeField(
         auto_now_add=True, help_text="Date when the product was created"
     )
+
     derniere_mise_a_jour = models.DateTimeField(
         auto_now=True, help_text="Date when the product was last updated"
     )
+
     is_deleted = models.BooleanField(default=False, help_text="Product deleted")
+
     deleted_at = models.DateTimeField(
         null=True, blank=True, help_text="Date when the product was deleted"
     )
-    code_produit = models.CharField(
-    max_length=20,
-    blank=True,
-)
 
     class Meta:
         ordering = ["nom_produit"]
         indexes = [
             models.Index(fields=["nom_produit"]),
-            models.Index(fields=["prix"]),
+            models.Index(fields=["ref_produit"]),
+            models.Index(fields=["prix_vente"]),
         ]
-    
+
+
     def save(self, *args, **kwargs):
-        if not self.code_produit:
-            prefix = MATIERE_PREFIXES.get(self.type_matiere, "OT")
+        if not self.ref_produit:
+            prefix = MATIERE_PREFIXES.get(self.materiau, "OT")
 
            
-            existing_codes = Produit.objects.filter(code_produit__startswith=prefix + "-") \
-                                            .values_list("code_produit", flat=True)
+            existing_codes = Produit.objects.filter(ref_produit__startswith=prefix + "-") \
+                                            .values_list("ref_produit", flat=True)
 
             max_number = 0
             for code in existing_codes:
@@ -282,7 +303,7 @@ class Produit(models.Model):
                 except (ValueError, IndexError):
                     continue
 
-            self.code_produit = f"{prefix}-{max_number + 1:04d}"
+            self.ref_produit = f"{prefix}-{max_number + 1:04d}"
 
         super().save(*args, **kwargs)
 
