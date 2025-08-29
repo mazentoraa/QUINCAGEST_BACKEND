@@ -445,7 +445,15 @@ class CdViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            
+            with transaction.atomic():
+                # 🔹 Restore stock from all linked PdC
+                pdcs = PdC.objects.filter(cd=commande)
+                for pdc in pdcs:
+                    produit = pdc.produit
+                    produit.stock -= pdc.quantite
+                    produit.save(update_fields=["stock"])
+                    print(f"♻️ Restored {pdc.quantite} to stock of {produit.nom_produit}")
+
             # Restore the record
             commande.is_deleted = False
             commande.save()
