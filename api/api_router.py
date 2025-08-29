@@ -7,7 +7,8 @@ from .views import (
     CheckAuthView,
     ProduitViewSet,
     EntrepriseViewSet,
-    
+    SousCategorieViewSet,
+    CategorieViewSet,
     #Tresorerie
     KPIView,
     ScheduleView,
@@ -49,6 +50,8 @@ from .views import AvoirViewSet
 router = DefaultRouter()
 router.register(r"clients", ClientViewSet)
 router.register(r"produits", ProduitViewSet)
+router.register(r"categories", CategorieViewSet)
+router.register(r"sous-categories", SousCategorieViewSet)   
 router.register(r"plans-traite", PlanTraiteViewSet)
 router.register(r"traites", TraiteViewSet)
 router.register(r"entreprises", EntrepriseViewSet)

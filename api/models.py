@@ -193,6 +193,22 @@ class Client(models.Model):
 #             return True
 #         return False
 
+class Categorie(models.Model):
+    nom = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return self.nom
+
+
+class SousCategorie(models.Model):
+    categorie = models.ForeignKey(Categorie, on_delete=models.CASCADE, related_name="sous_categories")
+    nom = models.CharField(max_length=100)
+
+    class Meta:
+        unique_together = ("categorie", "nom")
+
+    def __str__(self):
+        return f"{self.categorie.nom} → {self.nom}"
 
 class Produit(models.Model):
     nom_produit = models.CharField(max_length=255, help_text="Product name")
@@ -201,13 +217,9 @@ class Produit(models.Model):
         max_length=100, unique=True, help_text="Reference code for the product"
     )
 
-    categorie = models.CharField(
-        max_length=100, help_text="Main product category", blank=True, null=True
-    )
-
-    sous_categorie = models.CharField(
-        max_length=100, help_text="Sub-category of the product", blank=True, null=True
-    )
+    categorie = models.ForeignKey(Categorie, on_delete=models.SET_NULL, null=True, blank=True, related_name="produits")
+    
+    sous_categorie = models.ForeignKey(SousCategorie, on_delete=models.SET_NULL, null=True, blank=True, related_name="produits")
 
     materiau = models.CharField(
         max_length=100, help_text="Material of the product", blank=True, null=True

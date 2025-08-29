@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Client, Produit, Produit, Entreprise
+from drf_extra_fields.fields import Base64ImageField
+from rest_framework import serializers
+from .models import Client, Produit, Entreprise, Categorie, SousCategorie
 from drf_extra_fields.fields import Base64ImageField
 from django.db import transaction
 from decimal import Decimal
@@ -47,13 +49,35 @@ from decimal import Decimal
           
 #         )
 
+class CategorieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Categorie
+        fields = ["id", "nom"]
 
-from rest_framework import serializers
-from drf_extra_fields.fields import Base64ImageField
-from .models import Produit
+
+class SousCategorieSerializer(serializers.ModelSerializer):
+    categorie = CategorieSerializer(read_only=True)
+    categorie_id = serializers.PrimaryKeyRelatedField(
+        queryset=Categorie.objects.all(), source="categorie", write_only=True
+    )
+
+    class Meta:
+        model = SousCategorie
+        fields = ["id", "nom", "categorie", "categorie_id"]
+
 
 class ProduitSerializer(serializers.ModelSerializer):
+
     image = Base64ImageField(required=False, allow_null=True)
+    categorie = CategorieSerializer(read_only=True)
+    sous_categorie = SousCategorieSerializer(read_only=True)
+
+    categorie_id = serializers.PrimaryKeyRelatedField(
+        queryset=Categorie.objects.all(), source="categorie", write_only=True
+    )
+    sous_categorie_id = serializers.PrimaryKeyRelatedField(
+        queryset=SousCategorie.objects.all(), source="sous_categorie", write_only=True
+    )
 
     class Meta:
         model = Produit
@@ -63,6 +87,8 @@ class ProduitSerializer(serializers.ModelSerializer):
             "ref_produit",
             "categorie",
             "sous_categorie",
+            "categorie_id", 
+            "sous_categorie_id",
             "materiau",
             "fournisseur",
             "stock",
