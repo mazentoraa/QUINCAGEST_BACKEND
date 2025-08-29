@@ -217,7 +217,7 @@ class Produit(models.Model):
         max_length=255, help_text="Supplier of the product", blank=True, null=True
     )
 
-    stock_initial = models.PositiveIntegerField(
+    stock = models.PositiveIntegerField(
         default=0, help_text="Initial stock quantity"
     )
 

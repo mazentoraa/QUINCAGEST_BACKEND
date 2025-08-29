@@ -71,10 +71,10 @@ class CdViewSet(viewsets.ModelViewSet):
                         quantite = produit_serializer.validated_data["quantite"]
 
                         # Check stock
-                        if produit.stock_initial < quantite:
+                        if produit.stock < quantite:
                             raise ValidationError(
                                 f"Not enough stock for produit {produit.nom_produit}. "
-                                f"Available: {produit.stock_initial}, requested: {quantite}"
+                                f"Available: {produit.stock}, requested: {quantite}"
                             )
 
                         # Create PdC (Produit de Commande)
@@ -89,10 +89,10 @@ class CdViewSet(viewsets.ModelViewSet):
                         )
 
                         # 🔹 Decrease stock
-                        produit.stock_initial -= quantite
-                        produit.save(update_fields=["stock_initial"])
+                        produit.stock -= quantite
+                        produit.save(update_fields=["stock"])
 
-                        print(f"✅ Stock updated for {produit.nom_produit}: -{quantite}, remaining {produit.stock_initial}")
+                        print(f"✅ Stock updated for {produit.nom_produit}: -{quantite}, remaining {produit.stock}")
 
                     else:
                         print(f"Produit invalide: {produit_serializer.errors}")

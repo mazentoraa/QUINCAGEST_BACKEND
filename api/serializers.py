@@ -65,7 +65,7 @@ class ProduitSerializer(serializers.ModelSerializer):
             "sous_categorie",
             "materiau",
             "fournisseur",
-            "stock_initial",
+            "stock",
             "seuil_alerte",
             "unite_mesure",
             "statut",
