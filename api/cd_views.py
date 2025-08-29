@@ -404,7 +404,6 @@ class CdViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(commande).data)
 
 
-    # Enhanced restore method with better error handling and debugging
     @action(detail=True, methods=["post"])
     def restore(self, request, pk=None):
         """
@@ -481,44 +480,55 @@ class CdViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def delete_logically(self, request, pk=None):
         """
-        Soft delete a commande/invoice
+        Soft delete a commande/invoice and restore stock
         """
         print(f"🗑️ Attempting to soft delete Cd with ID: {pk}")
-        
+
         try:
             commande = self.get_object()
-            
+
             if commande.is_deleted:
                 return Response(
-                    {"error": "This record is already deleted"}, 
+                    {"error": "This record is already deleted"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            
-            commande.is_deleted = True
-            commande.save()
-            
+
+            with transaction.atomic():
+                # 🔹 Restore stock from all linked PdC
+                pdcs = PdC.objects.filter(cd=commande)
+                for pdc in pdcs:
+                    produit = pdc.produit
+                    produit.stock += pdc.quantite
+                    produit.save(update_fields=["stock"])
+                    print(f"♻️ Restored {pdc.quantite} to stock of {produit.nom_produit}")
+
+                # 🔹 Mark commande as deleted
+                commande.is_deleted = True
+                commande.save(update_fields=["is_deleted"])
+
             print(f"✅ Successfully soft deleted Cd {pk}")
-            
+
             return Response(
                 {
-                    "message": "Facture mise en corbeille.",
+                    "message": "Facture mise en corbeille et stock restauré.",
                     "id": commande.id,
                     "is_deleted": commande.is_deleted
-                }, 
+                },
                 status=status.HTTP_200_OK
             )
-            
+
         except Cd.DoesNotExist:
             return Response(
-                {"error": f"Cd with ID {pk} not found"}, 
+                {"error": f"Cd with ID {pk} not found"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
             print(f"❌ Unexpected error in delete_logically: {str(e)}")
             return Response(
-                {"error": f"Unexpected error: {str(e)}"}, 
+                {"error": f"Unexpected error: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
     # Add a debug endpoint to help troubleshoot
     @action(detail=False, methods=["get"])
