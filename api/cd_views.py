@@ -340,7 +340,6 @@ class CdViewSet(viewsets.ModelViewSet):
                 {"error": f"Client with ID {client_id} not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=False)
@@ -350,26 +349,51 @@ class CdViewSet(viewsets.ModelViewSet):
 
         produits_data = request.data.get("produit_commande", [])
         print(produits_data)
+
         with transaction.atomic():
+            # 🔹 Restore stock for existing PdC before deleting
+            old_pdcs = PdC.objects.filter(cd=instance)
+            for old_pdc in old_pdcs:
+                produit = old_pdc.produit
+                produit.stock += old_pdc.quantite
+                produit.save(update_fields=["stock"])
+                print(f"♻️ Restored {old_pdc.quantite} to stock of {produit.nom_produit}")
+
+            # Remove old product links
+            old_pdcs.delete()
+
             # Update the commande instance
             commande = serializer.save()
 
-            # Optional: Clear existing products (if full replacement is expected)
-            PdC.objects.filter(cd=commande).delete()
-
-            # Insert/Update products
+            # 🔹 Insert new PdC and decrease stock
             for produit_data in produits_data:
                 produit_serializer = CdPSerializer(data=produit_data)
                 if produit_serializer.is_valid():
+                    produit = produit_serializer.validated_data["produit"]
+                    quantite = produit_serializer.validated_data["quantite"]
+
+                    # Check stock
+                    if produit.stock < quantite:
+                        raise ValidationError(
+                            f"Not enough stock for produit {produit.nom_produit}. "
+                            f"Available: {produit.stock}, requested: {quantite}"
+                        )
+
+                    # Create new PdC
                     PdC.objects.create(
                         cd=commande,
-                        produit=produit_serializer.validated_data["produit"],
-                        quantite=produit_serializer.validated_data["quantite"],
+                        produit=produit,
+                        quantite=quantite,
                         prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
                         remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
                         bon_id=produit_serializer.validated_data.get("bon_id"),
                         bon_numero=produit_serializer.validated_data.get("bon_numero"),
                     )
+
+                    # Decrease stock
+                    produit.stock -= quantite
+                    produit.save(update_fields=["stock"])
+                    print(f"✅ Stock updated for {produit.nom_produit}: -{quantite}, remaining {produit.stock}")
                 else:
                     print(f"Produit invalide: {produit_serializer.errors}")
 
@@ -378,6 +402,7 @@ class CdViewSet(viewsets.ModelViewSet):
             commande.save()
 
         return Response(self.get_serializer(commande).data)
+
 
     # Enhanced restore method with better error handling and debugging
     @action(detail=True, methods=["post"])
