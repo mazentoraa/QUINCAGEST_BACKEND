@@ -358,6 +358,10 @@ class ProduitViewSet(viewsets.ModelViewSet):
         """
         Create a new product with validation
         """
+        serializer = ProduitSerializer(data=request.data)
+        if not serializer.is_valid():
+            print("Serializer errors:", serializer.errors)  # <--- this shows the exact field causing 400
+            return Response(serializer.errors, status=400)
         if not request.data.get("nom_produit"):
             return Response(
                 {"message": "Le nom du produit est obligatoire"},

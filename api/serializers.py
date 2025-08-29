@@ -90,16 +90,15 @@ class CategorieNestedSerializer(serializers.ModelSerializer):
 class ProduitSerializer(serializers.ModelSerializer):
 
     image = Base64ImageField(required=False, allow_null=True)
-    categorie = CategorieSerializer(read_only=True)
-    sous_categorie = SousCategorieSerializer(read_only=True)
-
-    categorie_id = serializers.PrimaryKeyRelatedField(
-        queryset=Categorie.objects.all(), source="categorie", write_only=True
+    
+    categorie = serializers.PrimaryKeyRelatedField(
+        queryset=Categorie.objects.all()
     )
-    sous_categorie_id = serializers.PrimaryKeyRelatedField(
-        queryset=SousCategorie.objects.all(), source="sous_categorie", write_only=True
+    sous_categorie = serializers.PrimaryKeyRelatedField(
+        queryset=SousCategorie.objects.all(),
+        required=False,
+        allow_null=True
     )
-
     class Meta:
         model = Produit
         fields = [
@@ -108,8 +107,6 @@ class ProduitSerializer(serializers.ModelSerializer):
             "ref_produit",
             "categorie",
             "sous_categorie",
-            "categorie_id", 
-            "sous_categorie_id",
             "materiau",
             "fournisseur",
             "stock",
