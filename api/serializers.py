@@ -72,7 +72,7 @@ class ProduitSerializer(serializers.ModelSerializer):
             "code_barres",
             "emplacement",
             "prix_achat",
-            "prix_vente",
+            "prix_unitaire",
             "description",
             "image",
             "date_creation",

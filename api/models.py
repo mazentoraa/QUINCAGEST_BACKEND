@@ -283,7 +283,7 @@ class Produit(models.Model):
         indexes = [
             models.Index(fields=["nom_produit"]),
             models.Index(fields=["ref_produit"]),
-            models.Index(fields=["prix_vente"]),
+            models.Index(fields=["prix_unitaire"]),
         ]
 
 

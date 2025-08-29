@@ -958,8 +958,8 @@ class PlanTraiteFournisseurViewSet(viewsets.ModelViewSet):
 
         numero_facture = validated_data.get('numero_facture')
         try:
-            facture = FactureAchatMatiere.objects.get(numero=numero_facture)
-        except FactureAchatMatiere.DoesNotExist:
+            facture = FactureAchatProduit.objects.get(numero=numero_facture)
+        except FactureAchatProduit.DoesNotExist:
             return Response(
                 {"numero_facture": ["Facture introuvable."]},
                 status=status.HTTP_400_BAD_REQUEST

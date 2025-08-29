@@ -78,15 +78,15 @@ class FactureProduitsViewSet(viewsets.ModelViewSet):
                         type=openapi.TYPE_OBJECT,
                         required=["work_id"],
                         properties={
-                            "work_id": openapi.Schema(
-                                type=openapi.TYPE_INTEGER,
-                                description="ID of the Traveaux (work item)",
-                            ),
+                            # "work_id": openapi.Schema(
+                            #     type=openapi.TYPE_INTEGER,
+                            #     description="ID of the Traveaux (work item)",
+                            # ),
                             "produit_id": openapi.Schema(
                                 type=openapi.TYPE_INTEGER,
                                 description="ID of the product (for reference)",
                             ),
-                            "produit_name": openapi.Schema(
+                            "nom_produit": openapi.Schema(
                                 type=openapi.TYPE_STRING,
                                 description="Name of the product (for reference)",
                             ),

@@ -39,7 +39,6 @@ class CdViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             return CdListSerializer
         return CDetailSerializer
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         print("📦 Incoming request data:")
@@ -48,8 +47,8 @@ class CdViewSet(viewsets.ModelViewSet):
             print("❌ Validation errors:")
             print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
-        bon_ids  = request.data.get("bons", [])
+
+        bon_ids = request.data.get("bons", [])
         print("Received bons:", bon_ids)
 
         with transaction.atomic():
@@ -63,20 +62,38 @@ class CdViewSet(viewsets.ModelViewSet):
             else:
                 print("Aucun bon valide reçu")
 
-            # Products remain untouched
+            # 🔹 Handle produits + decrease stock
             if "produits" in request.data and isinstance(request.data["produits"], list):
                 for produit_data in request.data["produits"]:
                     produit_serializer = CdPSerializer(data=produit_data)
                     if produit_serializer.is_valid():
+                        produit = produit_serializer.validated_data["produit"]
+                        quantite = produit_serializer.validated_data["quantite"]
+
+                        # Check stock
+                        if produit.stock_initial < quantite:
+                            raise ValidationError(
+                                f"Not enough stock for produit {produit.nom_produit}. "
+                                f"Available: {produit.stock_initial}, requested: {quantite}"
+                            )
+
+                        # Create PdC (Produit de Commande)
                         PdC.objects.create(
                             cd=commande,
-                            produit=produit_serializer.validated_data["produit"],
-                            quantite=produit_serializer.validated_data["quantite"],
+                            produit=produit,
+                            quantite=quantite,
                             prix_unitaire=produit_serializer.validated_data.get("prix_unitaire"),
                             remise_pourcentage=produit_serializer.validated_data.get("remise_pourcentage", 0),
-                            bon_id=produit_serializer.validated_data.get("bon_id"), 
+                            bon_id=produit_serializer.validated_data.get("bon_id"),
                             bon_numero=produit_serializer.validated_data.get("bon_numero"),
                         )
+
+                        # 🔹 Decrease stock
+                        produit.stock_initial -= quantite
+                        produit.save(update_fields=["stock_initial"])
+
+                        print(f"✅ Stock updated for {produit.nom_produit}: -{quantite}, remaining {produit.stock_initial}")
+
                     else:
                         print(f"Produit invalide: {produit_serializer.errors}")
 
@@ -84,7 +101,6 @@ class CdViewSet(viewsets.ModelViewSet):
             commande.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
 
     @action(detail=True, methods=["post"])
     def add_product(self, request, pk=None):
