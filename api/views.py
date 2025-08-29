@@ -10,7 +10,8 @@ from .serializers import (
     ProduitSerializer,
     EntrepriseSerializer,
     CategorieSerializer,
-    SousCategorieSerializer
+    SousCategorieSerializer,
+    CategorieNestedSerializer
 )
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.views import APIView
@@ -314,8 +315,20 @@ from rest_framework import status
 
 
 class CategorieViewSet(viewsets.ModelViewSet):
-    queryset = Categorie.objects.all()
-    serializer_class = CategorieSerializer
+    queryset = Categorie.objects.prefetch_related("sous_categories__produits", "produits").all()
+    
+    # Use normal serializer by default
+    def get_serializer_class(self):
+        if self.action == "list_tree":  # custom action for frontend tree
+            return CategorieNestedSerializer
+        return CategorieSerializer
+
+    # custom endpoint for tree
+    @action(detail=False, methods=["get"])
+    def list_tree(self, request):
+        queryset = self.get_queryset()
+        serializer = CategorieNestedSerializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class SousCategorieViewSet(viewsets.ModelViewSet):

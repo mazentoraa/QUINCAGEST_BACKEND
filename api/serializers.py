@@ -64,7 +64,28 @@ class SousCategorieSerializer(serializers.ModelSerializer):
     class Meta:
         model = SousCategorie
         fields = ["id", "nom", "categorie", "categorie_id"]
+        
+class SousCategorieNestedSerializer(serializers.ModelSerializer):
+    count = serializers.SerializerMethodField()
 
+    class Meta:
+        model = SousCategorie
+        fields = ["id", "nom", "count"]
+
+    def get_count(self, obj):
+        return obj.produits.count()  # Number of products in this sub-category
+
+
+class CategorieNestedSerializer(serializers.ModelSerializer):
+    children = SousCategorieNestedSerializer(source="sous_categories", many=True)
+    count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Categorie
+        fields = ["id", "nom", "count", "children"]
+
+    def get_count(self, obj):
+        return obj.produits.count()  # Total products in this category (sum or related)
 
 class ProduitSerializer(serializers.ModelSerializer):
 
