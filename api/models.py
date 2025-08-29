@@ -252,7 +252,7 @@ class Produit(models.Model):
         null=True, blank=True, help_text="Purchase price of the product"
     )
 
-    prix_vente = models.FloatField(
+    prix_unitaire = models.FloatField(
         null=True, blank=True, help_text="Selling price of the product"
     )
 
