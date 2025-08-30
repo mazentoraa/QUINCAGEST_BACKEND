@@ -30,7 +30,7 @@ DATABASE_URL = os.environ.get('POSTGRES_URL', '')
 SECRET_KEY = 'django-insecure-o=)yd(t+$o)+g3$%k-#2dg7h&1m=f@*sc)untun2tn0mk*3d43'
 
 
-ALLOWED_HOSTS = ["*", "akrambenghanem.pythonanywhere.com"]
+ALLOWED_HOSTS = ["*", "mazentoraa.pythonanywhere.com"]
 
 
 # Application definition
@@ -86,7 +86,7 @@ CORS_ALLOW_ALL_ORIGINS = True  # For quick testing only, change to specific orig
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    "https://metal-gest.vercel.app"
+    "https://quincagest.vercel.app"
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -130,6 +130,7 @@ REST_FRAMEWORK = {
 # Allow frontend to access the API
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Adjust for your frontend URL TODO
+    "https://mazentoraa.pythonanywhere.com"
 ]
 
 ROOT_URLCONF = 'lazercut.urls'
