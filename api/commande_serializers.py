@@ -4,14 +4,14 @@ from .models import Commande, ProduitCommande, Produit
 
 class ProduitCommandeSerializer(serializers.ModelSerializer):
     nom_produit = serializers.ReadOnlyField(source="produit.nom_produit")
-    code_produit = serializers.ReadOnlyField(source="produit.code_produit")
+    ref_produit = serializers.ReadOnlyField(source="produit.ref_produit")
     class Meta:
         model = ProduitCommande
         fields = [
             "id",
             "produit",
             "nom_produit",
-            "code_produit",
+            "ref_produit",
             "quantite",
             "prix_unitaire",
             "remise_pourcentage",
@@ -94,7 +94,7 @@ class CommandeDetailSerializer(serializers.ModelSerializer):
                 "id": p.id,
                 "nom_produit": p.nom_produit,
                 "prix": p.prix,
-                "code_produit":p.code_produit ,
+                "ref_produit":p.ref_produit ,
             }
             for p in produits
         ]

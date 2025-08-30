@@ -22,7 +22,7 @@ class InvoiceItemSerializer(serializers.Serializer):
     
     # Product details (assumes `produit` is related field on Traveaux)
     produit_id = serializers.IntegerField(source="produit.id", read_only=True)
-    code_produit = serializers.CharField(source="produit.code_produit", read_only=True)
+    ref_produit = serializers.CharField(source="produit.ref_produit", read_only=True)
     nom_produit = serializers.CharField(source="produit.nom_produit", read_only=True)
     description_produit = serializers.CharField(source="produit.description", read_only=True)
     
