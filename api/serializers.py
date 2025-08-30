@@ -73,7 +73,7 @@ class SousCategorieNestedSerializer(serializers.ModelSerializer):
         fields = ["id", "nom", "count"]
 
     def get_count(self, obj):
-        return obj.produits.count()  # Number of products in this sub-category
+        return obj.produits.filter(is_deleted=False).count()  # Number of products in this sub-category
 
 
 class CategorieNestedSerializer(serializers.ModelSerializer):
@@ -85,7 +85,7 @@ class CategorieNestedSerializer(serializers.ModelSerializer):
         fields = ["id", "nom", "count", "children"]
 
     def get_count(self, obj):
-        return obj.produits.count()  # Total products in this category (sum or related)
+        return obj.produits.filter(is_deleted=False).count()  # Total products in this category (sum or related)
 
 class ProduitSerializer(serializers.ModelSerializer):
 
