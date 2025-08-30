@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Client, Traveaux, Produit, FactureProduits
+from .models import Client, Produit, FactureProduits
 from .serializers import ClientSerializer
 from django.db import transaction
 from django.utils import timezone
